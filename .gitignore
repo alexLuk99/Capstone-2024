@@ -1,0 +1,6 @@
+# Ignore the raw files to be NDA conform
+*.xlsx
+
+# Ignore IDE/Editor specific files
+.idea/
+.vscode/

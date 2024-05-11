@@ -2,7 +2,12 @@ import pandas as pd
 
 def read_prepare_data() -> pd.DataFrame:
     # Read and prepare assistance file
-    df_assistance = pd.read_excel('data/raw/Assistance_Report_Europa_2021-2023_anonymized.xlsx')
+    sheets = ['2021', '2022', '2023']
+    assistance_list = []
+    for sheet in sheets:
+        tmp = pd.read_excel('data/raw/Assistance_Report_Europa_2021-2023_anonymized.xlsx', sheet_name=sheet)
+        assistance_list.append(tmp)
+    df_assistance = pd.concat(assistance_list, ignore_index=True)
     df_assistance = df_assistance.convert_dtypes()
     df_assistance['Incident Date'] = pd.to_datetime(df_assistance['Incident Date'], format='%d/%m/%Y')
     df_assistance['Incident Date'] = df_assistance['Incident Date'] + pd.to_timedelta(

@@ -15,7 +15,7 @@ def read_prepare_data() -> pd.DataFrame:
 
     date_columns = ['Registration Date', 'Policy Start Date', 'Policy End Date']
     for column in date_columns:
-        df_assistance[column] = pd.to_datetime(df_assistance[column], errors='coerce')
+        df_assistance[column] = pd.to_datetime(df_assistance[column], errors='coerce') #coerce -> alle ungültigen Werte werden auf NaT gesetzt
 
     # Read and prepare workshop file
     df_workshop = pd.read_excel('data/raw/Q-Lines_anonymized.xlsx')

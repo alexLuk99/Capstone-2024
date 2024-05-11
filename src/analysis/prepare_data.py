@@ -53,6 +53,9 @@ def read_prepare_data() -> pd.DataFrame:
     df_assistance.loc[df_assistance['Monat'].isna(), 'Monat'] = df_assistance['Incident Date'].dt.month
 
     # Map Reason Of Call
+    # create new column Reson of Call Mapped for mapping
+    # fill new column na values with values from column Reason Of Call
+    # drop Reason Of Call and rename Reason of Call Mapped in Reason Of Call
     mapping_roc = {
         '1': 'Breakdown - Technical defect',
         '2': 'Breakdown - Misuse',
@@ -64,11 +67,15 @@ def read_prepare_data() -> pd.DataFrame:
 
     df_assistance['Reason Of Call Mapped'] = df_assistance['Reason Of Call'].map(mapping_roc)
     df_assistance.loc[df_assistance['Reason Of Call Mapped'].isna(), 'Reason Of Call Mapped'] = df_assistance['Reason Of Call']
+    df_assistance = df_assistance.drop(columns=['Reason Of Call'])
+    df_assistance = df_assistance.rename(columns={'Reason Of Call Mapped': 'Reason Of Call'})
 
     # Read and prepare workshop file
-    df_workshop = pd.read_excel('data/raw/Q-Lines_anonymized.xlsx')
+    df_workshop = pd.read_excel(open('data/raw/Q-Lines_anonymized.xlsx', 'rb'))
     df_workshop = df_workshop.convert_dtypes()
-    df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%d/%m/%Y')
+    df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%Y%m%d')
+
+
 
     # Merge files if possible (don't think we can tbh)
 

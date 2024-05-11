@@ -19,7 +19,11 @@ def read_prepare_data() -> pd.DataFrame:
 
     # Read and prepare workshop file
     df_workshop = pd.read_excel('data/raw/Q-Lines_anonymized.xlsx')
+    df_workshop = df_workshop.convert_dtypes()
+    df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%d/%m/%Y')
 
     # Merge files if possible (don't think we can tbh)
 
     # Return either single file or both in a dataclass
+
+

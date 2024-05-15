@@ -80,6 +80,7 @@ def read_prepare_data() -> pd.DataFrame:
     interim_path.mkdir(parents=True, exist_ok=True)
 
     # Write processed assistance file
+    df_assistance = df_assistance.convert_dtypes()
     df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
 
     logger.info('Prepare assistance report ... done')
@@ -90,6 +91,7 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop = df_workshop.convert_dtypes()
     df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%Y%m%d')
 
+    df_workshop.convert_dtypes()
     df_workshop.to_csv(interim_path / 'workshop.csv', index=False)
 
     logger.info('Prepare workshop file ... done')

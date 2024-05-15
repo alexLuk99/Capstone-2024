@@ -1,5 +1,6 @@
 # Ignore the raw files to be NDA conform
 *.xlsx
+*.html
 
 # Ignore IDE/Editor specific files
 .idea/

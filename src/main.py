@@ -1,5 +1,6 @@
 from typing import List
 
+from src.analysis.analyse_data import analyse_data
 from src.preprocessing.prepare_data import read_prepare_data
 
 
@@ -19,4 +20,4 @@ class Capstone:
         self.data = read_prepare_data()
 
     def analyse_data(self):
-        pass
+        analyse_data()

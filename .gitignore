@@ -1,4 +1,6 @@
 # Ignore the raw files to be NDA conform
+data
+*.csv
 *.xlsx
 *.html
 

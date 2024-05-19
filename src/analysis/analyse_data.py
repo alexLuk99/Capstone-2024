@@ -4,6 +4,7 @@ import altair as alt
 
 from src.analysis.statistics.chi_square import perform_chi_square_test
 from src.analysis.visuals.choropleth import create_country_choropleth
+from src.analysis.visuals.timeline import get_timeline
 
 
 def analyse_data() -> None:
@@ -41,10 +42,17 @@ def analyse_data() -> None:
     # create_country_choropleth(df=df_assistance, column='Country Of Origin', title='Number of permits')
     # create_country_choropleth(df=df_assistance, column='Country Of Incident', title='Number of incidents')
 
-    chi, p, significant = perform_chi_square_test(data=df_assistance, col1='Component', col2='Outcome Description')
+    # perform_chi_square_test(data=df_assistance, col1='Component', col2='Outcome Description')
+    # perform_chi_square_test(data=df_assistance, col1='Component', col2='Reason Of Call')
+    # perform_chi_square_test(data=df_assistance, col1='Outcome Description', col2='Reason Of Call')
+    # perform_chi_square_test(data=df_assistance, col1='Report Type', col2='Component')
+    # perform_chi_square_test(data=df_assistance, col1='Report Type', col2='Outcome Description')
+    # perform_chi_square_test(data=df_assistance, col1='Report Type', col2='Reason Of Call')
+
+    get_timeline(data=df_assistance, col='Incident Date', aggregate='Monat')
+
 
     ### WORKSHOP ANALYSYS ###
     df_workshop = pd.read_csv('data/interim/workshop.csv')
-
 
     pass

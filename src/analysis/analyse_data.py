@@ -8,10 +8,6 @@ from src.analysis.visuals.crosstab_heatmap import crosstab_heatmap
 from src.analysis.visuals.most_common_word import most_common_word
 from src.analysis.visuals.start_end_date import policy_start_end_date
 from src.analysis.visuals.timeline import get_timeline
-import altair as alt
-import numpy as np
-import statsmodels.api as sm
-from datetime import datetime, timedelta
 
 
 def analyse_data() -> None:
@@ -36,16 +32,6 @@ def analyse_data() -> None:
 
     # Barchart mit normalisierte Spalte
     normalized_barchart_log(data=df_assistance, col='VIN', output_path=output_path)
-
-    # # Häufigkeit der Werte in der Spalte 'Component'
-    # component_value_counts = df_assistance['Component'].value_counts()
-    # print("Häufigkeit der Werte in der Spalte 'Component':")
-    # print(component_value_counts)
-    #
-    # # Häufigkeit der Werte in der Spalte 'Outcome Description'
-    # outcome_value_counts = df_assistance['Outcome Description'].value_counts()
-    # print("Häufigkeit der Werte in der Spalte 'Outcome Description':")
-    # print(outcome_value_counts)
 
     # Kreuztabelle erstellen und sortieren
     crosstab_heatmap(data=df_assistance, col1='Component', col2='Outcome Description', output_path=output_path)

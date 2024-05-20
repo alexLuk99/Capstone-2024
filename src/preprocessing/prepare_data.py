@@ -94,6 +94,10 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop.convert_dtypes()
     df_workshop.to_csv(interim_path / 'workshop.csv', index=False)
 
+    filtered_df.convert_dtypes()
+    filtered_df.to_csv('data/interim/filtered.csv', index=False)
+
+
     logger.info('Prepare workshop file ... done')
 
     # Merge files if possible (don't think we can tbh)

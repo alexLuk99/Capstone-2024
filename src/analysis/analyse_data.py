@@ -121,7 +121,8 @@ def analyse_data() -> None:
 
 
 
-    #
+    #Testbums
+    filtered_df = df_workshop[df_workshop['FIN'] == '00280387458c4197c']
 
 
 

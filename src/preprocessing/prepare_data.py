@@ -40,6 +40,7 @@ def read_prepare_data() -> pd.DataFrame:
     # Convert Incident Date to DateTime and add time from Time of Call
 
     df_assistance['Incident Date'] = pd.to_datetime(df_assistance['Incident Date'], format='%d/%m/%Y')
+    df_assistance['Day of Incident'] = df_assistance['Incident Date']
     df_assistance['Incident Date'] = df_assistance['Incident Date'] + pd.to_timedelta(
         df_assistance['Time Of Call'] + ':00')
 
@@ -80,6 +81,14 @@ def read_prepare_data() -> pd.DataFrame:
     # Odomoter aufbereiten, negative Werte, Werte unter 100km, und Werte über 100.000km werden mit pd.NA ersetzt
     df_assistance['Odometer'] = pd.to_numeric(df_assistance['Odometer'], errors='coerce')
     df_assistance.loc[(df_assistance['Odometer'] <= 100) | (df_assistance['Odometer'] >= 999_999), 'Odometer'] = pd.NA
+
+    # Anrufe vom gleichen Fahrzeug am gleichen Tag werden nur einmal mitgenommen
+    df_assistance = df_assistance.sort_values(by='Incident Date')
+    df_assistance_filtered = df_assistance.drop_duplicates(subset=['VIN', 'Day of Incident'])
+
+    # df_assistance_filtered['14_day_window'] = df_assistance_filtered.groupby('VIN')['Incident Date'].diff().dt.days <= 14
+    # multiple_calls = df_assistance_filtered[df_assistance_filtered['14_day_window']].groupby('VIN').size().reset_index(name='counts')
+    # multiple_calls = multiple_calls[multiple_calls['counts'] > 1]
 
     # create interim path
     interim_path = Path('data/interim')

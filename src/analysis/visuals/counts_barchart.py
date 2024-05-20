@@ -23,6 +23,7 @@ def counts_barchart(data: pd.DataFrame, col: str, output_path: Path) -> None:
 
     chart.save(output_path / f'{col}_count.html')
 
+
 def counts_barchart_log(data: pd.DataFrame, col: str, output_path: Path) -> None:
     df = pd.DataFrame(data[col]).copy()
 
@@ -36,6 +37,7 @@ def counts_barchart_log(data: pd.DataFrame, col: str, output_path: Path) -> None
     )
 
     chart.save(output_path / f'{col}_count_log.html')
+
 
 def normalized_barchart_log(data: pd.DataFrame, col: str, output_path: Path) -> alt.Chart:
     df = pd.DataFrame(data[col]).copy()
@@ -79,3 +81,20 @@ def normalized_barchart_log(data: pd.DataFrame, col: str, output_path: Path) -> 
     counts.to_csv(output_path / f'{col}_frequency_counts.csv', index=False)
 
     # print(counts['Frequency'].describe())
+
+
+def counts_barchart_color(data: pd.DataFrame, col: str, color: str, output_path: Path) -> None:
+    df = data[[col, color]].copy()
+
+    chart = alt.Chart(df).mark_bar().encode(
+        alt.X(f'{col}:N', title=f'{col}'),
+        alt.Y(f'count({col}):Q', title='Anzahl'),
+        color=f'{color}:N',
+        tooltip=[
+            alt.Tooltip(f'{color}:N', title=f'{color}'),
+            alt.Tooltip(f'{col}:N', title=f'{col}'),
+            alt.Tooltip(f'count({col}):Q', title='Anzahl', format=',.0f'),
+        ]
+    )
+
+    chart.save(output_path / f'{col}_{color}_chart.html')

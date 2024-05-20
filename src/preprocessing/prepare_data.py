@@ -66,7 +66,9 @@ def read_prepare_data() -> pd.DataFrame:
         '3': 'Accident',
         '4': 'Others',
         '5': 'Theft',
-        '6': 'Vandalism'
+        '6': 'Vandalism',
+        '7': '',
+        '8': ''
     }
 
     df_assistance['Reason Of Call Mapped'] = df_assistance['Reason Of Call'].map(mapping_roc)
@@ -74,6 +76,10 @@ def read_prepare_data() -> pd.DataFrame:
         'Reason Of Call']
     df_assistance = df_assistance.drop(columns=['Reason Of Call'])
     df_assistance = df_assistance.rename(columns={'Reason Of Call Mapped': 'Reason Of Call'})
+
+    # Odomoter aufbereiten, negative Werte, Werte unter 100km, und Werte über 100.000km werden mit pd.NA ersetzt
+    df_assistance['Odometer'] = pd.to_numeric(df_assistance['Odometer'], errors='coerce')
+    df_assistance.loc[(df_assistance['Odometer'] <= 100) | (df_assistance['Odometer'] >= 999_999), 'Odometer'] = pd.NA
 
     # create interim path
     interim_path = Path('data/interim')

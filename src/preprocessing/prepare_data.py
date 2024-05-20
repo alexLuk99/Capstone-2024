@@ -113,6 +113,40 @@ def read_prepare_data() -> pd.DataFrame:
     filtered_df.to_csv('data/interim/filtered.csv', index=False)
 
 
+
+    # Merging Assistance Workshop
+
+    # Konvertiere Datumsangaben in datetime-Objekte
+    df_assistance['Incident Date'] = pd.to_datetime(df_assistance['Incident Date'])
+    df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'])
+
+    # Mergen der DataFrames basierend auf VIN und FIN
+    merged_df = pd.merge(df_assistance, df_workshop, left_on='VIN', right_on='FIN', suffixes=('_df_assistance', '_df_workshop'))
+
+    # Anwenden der Toleranzbedingungen
+    tolerance_days = 14  # 2 Wochen
+    tolerance_km = 100
+
+    matched_df = merged_df[
+        (abs(merged_df['Incident Date'] - merged_df['Reparaturbeginndatum']) <= timedelta(days=tolerance_days)) &
+        (abs(merged_df['Odometer'] - merged_df['Kilometerstand Reparatur']) <= tolerance_km)
+        ]
+
+    matched_df.convert_dtypes()
+    matched_df.to_csv('data/interim/matched.csv', index=False)
+
+
+
+
+    # Überpürfen ob Reparaturdaten bei Werkstattaufenthalten identisch sind (Marcs Idee)
+
+    df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'])
+
+
+
+
+
+
     logger.info('Prepare workshop file ... done')
 
     # Merge files if possible (don't think we can tbh)

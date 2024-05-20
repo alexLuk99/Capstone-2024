@@ -95,8 +95,24 @@ def analyse_data() -> None:
         (abs(merged_df['Odometer'] - merged_df['Kilometerstand Reparatur']) <= tolerance_km)
         ]
 
+    matched_df.convert_dtypes()
+    matched_df.to_csv('data/interim/matched.csv', index=False)
+
+    # Überpürfen ob Reparaturdaten bei Werkstattaufenthalten identisch sind (Marcs Idee)
+
+    df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'])
+
+    # Finden der mehrfach vorkommenden Einträge in 'Werkstattaufenthalt'
+    duplicate_entries = df_workshop[df_workshop.duplicated('Werkstattaufenthalt', keep=False)]
+
+    # Gruppieren nach 'Werkstattaufenthalt' und prüfen, ob die 'Reparaturbeginndaten' identisch sind
+    results = duplicate_entries.groupby('Werkstattaufenthalt')['Reparaturbeginndatum'].nunique().reset_index()
+
+    # Ergebnisse anzeigen, bei denen die Reparaturbeginndaten nicht identisch sind
+    not_identical_dates = results[results['Reparaturbeginndatum'] > 1]
+    print(not_identical_dates)
 
 
-
+    a = 1
 
     pass

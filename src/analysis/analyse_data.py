@@ -77,6 +77,9 @@ def analyse_data() -> None:
     chart.save('components_outcome_services.html')
     print("Chart saved as 'components_outcome_services.html'")
 
+
+
+
     # Merging Assistance Workshop
 
     # Konvertiere Datumsangaben in datetime-Objekte
@@ -98,6 +101,9 @@ def analyse_data() -> None:
     matched_df.convert_dtypes()
     matched_df.to_csv('data/interim/matched.csv', index=False)
 
+
+
+
     # Überpürfen ob Reparaturdaten bei Werkstattaufenthalten identisch sind (Marcs Idee)
 
     df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'])
@@ -111,6 +117,12 @@ def analyse_data() -> None:
     # Ergebnisse anzeigen, bei denen die Reparaturbeginndaten nicht identisch sind
     not_identical_dates = results[results['Reparaturbeginndatum'] > 1]
     print(not_identical_dates)
+
+
+
+
+    #
+
 
 
     a = 1

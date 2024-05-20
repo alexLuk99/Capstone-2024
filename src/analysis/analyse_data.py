@@ -1,6 +1,5 @@
 from pathlib import Path
 import pandas as pd
-import altair as alt
 
 from src.analysis.visuals.chi_square import perform_chi_square_test
 from src.analysis.visuals.choropleth import create_country_choropleth
@@ -23,31 +22,31 @@ def analyse_data() -> None:
     output_path.mkdir(exist_ok=True, parents=True)
 
     # Difference between policy start/end date with first assistance call
-    # policy_start_end_date(data=df_assistance, output_path=output_path)
-    #
-    # # Erstellen von Barcharts
-    # counts_barchart(data=df_assistance, col='Country Of Origin', output_path=output_path)
-    # counts_barchart(data=df_assistance, col='Outcome Description', output_path=output_path)
-    # counts_barchart(data=df_assistance, col='Component', output_path=output_path)
-    # counts_barchart(data=df_assistance, col='Typ aus VIN', output_path=output_path)
-    # # counts_barchart(data=df_assistance, col='VIN', output_path=output_path)
-    #
-    # # Erstellen von Barcharts mit Farbe
-    # counts_barchart_color(data=df_assistance, col='Model Year', color='Typ aus VIN', output_path=output_path)
-    # counts_barchart_color(data=df_assistance, col='Component', color='Outcome Description', output_path=output_path)
-    # counts_barchart_color(data=df_assistance, col='Model Year', color='Typ aus VIN', output_path=output_path)
-    #
-    # # Extrahiere die gebräuchigsten Wörter aus der Spalter "Fault Description Customer"
-    # most_common_word(data=df_assistance, output_path=output_path)
-    #
-    # # Barchart mit normalisierte Spalte
-    # normalized_barchart_log(data=df_assistance, col='VIN', output_path=output_path)
-    #
-    # # Kreuztabelle erstellen und sortieren
-    # crosstab_heatmap(data=df_assistance, col1='Component', col2='Outcome Description', output_path=output_path)
-    #
-    # # Odometer
-    # counts_barchart_log(data=df_assistance, col='Odometer', output_path=output_path)
+    policy_start_end_date(data=df_assistance, output_path=output_path)
+
+    # Erstellen von Barcharts
+    counts_barchart(data=df_assistance, col='Country Of Origin', output_path=output_path)
+    counts_barchart(data=df_assistance, col='Outcome Description', output_path=output_path)
+    counts_barchart(data=df_assistance, col='Component', output_path=output_path)
+    counts_barchart(data=df_assistance, col='Typ aus VIN', output_path=output_path)
+    # counts_barchart(data=df_assistance, col='VIN', output_path=output_path)
+
+    # Erstellen von Barcharts mit Farbe
+    counts_barchart_color(data=df_assistance, col='Model Year', color='Typ aus VIN', output_path=output_path)
+    counts_barchart_color(data=df_assistance, col='Component', color='Outcome Description', output_path=output_path)
+    counts_barchart_color(data=df_assistance, col='Model Year', color='Typ aus VIN', output_path=output_path)
+
+    # Extrahiere die gebräuchigsten Wörter aus der Spalter "Fault Description Customer"
+    most_common_word(data=df_assistance, output_path=output_path)
+
+    # Barchart mit normalisierte Spalte
+    normalized_barchart_log(data=df_assistance, col='VIN', output_path=output_path)
+
+    # Kreuztabelle erstellen und sortieren
+    crosstab_heatmap(data=df_assistance, col1='Component', col2='Outcome Description', output_path=output_path)
+
+    # Odometer
+    counts_barchart_log(data=df_assistance, col='Odometer', output_path=output_path)
 
     # Abhängigkeit zwischen Component, Outcome und Services darstellen
     component_outcome_services(data=df_assistance, output_path=output_path)

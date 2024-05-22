@@ -1,6 +1,6 @@
 from loguru import logger
 from pathlib import Path
-
+from datetime import timedelta
 import pandas as pd
 
 
@@ -94,8 +94,46 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop.convert_dtypes()
     df_workshop.to_csv(interim_path / 'workshop.csv', index=False)
 
-    filtered_df.convert_dtypes()
-    filtered_df.to_csv('data/interim/filtered.csv', index=False)
+    # filtered_df.convert_dtypes()
+    # filtered_df.to_csv('data/interim/filtered.csv', index=False)
+
+    # Merging Assistance Workshop
+
+    # Konvertiere Datumsangaben in datetime-Objekte
+    df_assistance['Incident Date'] = pd.to_datetime(df_assistance['Incident Date'])
+    df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'])
+
+    # Mergen der DataFrames basierend auf VIN und FIN
+    merged_df = pd.merge(df_assistance, df_workshop, left_on='VIN', right_on='FIN',
+                         suffixes=('_df_assistance', '_df_workshop'))
+
+    # Anwenden der Toleranzbedingungen
+    tolerance_days = 14  # 2 Wochen
+    tolerance_km = 100
+
+    # Filtere alle möglichen Kombinationen, die innerhalb der Toleranzen liegen
+    filtered_df = merged_df[
+        (abs(merged_df['Incident Date'] - merged_df['Reparaturbeginndatum']) <= timedelta(days=tolerance_days)) &
+        (abs(merged_df['Odometer'] - merged_df['Kilometerstand Reparatur']) <= tolerance_km)
+        ]
+
+    # Bestimme den nächsten Eintrag aus df_assistance für jeden Eintrag in df_workshop
+    def get_nearest_entry(group):
+        idx_min = (group['Incident Date'] - group['Reparaturbeginndatum']).abs().idxmin()
+        return group.loc[idx_min]
+
+    # Gruppiere nach 'Reparaturbeginndatum' und finde den nächsten Eintrag
+    nearest_df = filtered_df.groupby('Reparaturbeginndatum', group_keys=False).apply(get_nearest_entry)
+
+    # Konvertiere Datentypen und speichere das Ergebnis
+    nearest_df.convert_dtypes()
+    nearest_df.to_csv('data/interim/nearestmatched.csv', index=False)
+
+
+
+
+
+
 
 
     logger.info('Prepare workshop file ... done')

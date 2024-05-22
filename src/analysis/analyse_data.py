@@ -15,6 +15,37 @@ def analyse_data() -> None:
     output_path = Path('output')
     output_path.mkdir(exist_ok=True, parents=True)
 
+
+    #%%
+
+    # Remove rows where 'Reason Of Call' is empty
+    df_assistance = df_assistance.dropna(subset=['Reason Of Call'])
+
+    # Replace numeric values 7 and 8 in 'Reason Of Call' column
+    df_assistance['Reason Of Call'] = df_assistance['Reason Of Call'].astype(str).replace({
+        '7': 'Tyre Breakdown',
+        '8': 'Tyre Accident'
+    })
+
+    # Count frequency of each category in 'Reason Of Call'
+    value_counts = df_assistance['Reason Of Call'].value_counts().reset_index()
+    value_counts.columns = ['Reason Of Call', 'Frequency']
+
+    # Create a logarithmic bar chart with Altair
+    bar_chart = alt.Chart(value_counts).mark_bar().encode(
+        x=alt.X('Frequency:Q', title='Frequency', scale=alt.Scale(type='log')),
+        y=alt.Y('Reason Of Call:N', sort='-x', title='Reason Of Call'),
+        tooltip=['Reason Of Call', 'Frequency']
+    ).properties(
+        title='Frequency of Categories in "Reason Of Call"',
+        width=800,
+        height=400
+    )
+
+    # Save the diagram
+    bar_chart.save(output_path / 'reason_of_call_frequency_logarithmic.html')
+
+
     '''
     
     #%% Heatmep Bolean 

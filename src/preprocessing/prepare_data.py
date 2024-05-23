@@ -139,6 +139,7 @@ def read_prepare_data() -> pd.DataFrame:
     # Policy Duration
     # ToDo: Alle Daten mit Policy Start Date vor Gründung von Porsche Assistance mit pd.NaT ersetzen
     # Porsche Assistance has a maximum duration of 3 years, so all Policy End Dates which are greater than 01.01.2027 are unrealistic
+    df_assistance.loc[df_assistance['Policy Start Date'] < pd.to_datetime('2002-01-01', format='%Y-%m-%d'), 'Policy Start Date'] = pd.NaT
     df_assistance.loc[df_assistance['Policy End Date'] >= pd.to_datetime('2027-01-01', format='%Y-%m-%d'), 'Policy End Date'] = pd.NaT
     df_assistance.loc[df_assistance['Policy End Date'] <= df_assistance['Policy Start Date'], 'Policy End Date'] = pd.NaT
 

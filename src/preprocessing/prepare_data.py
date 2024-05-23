@@ -71,8 +71,8 @@ def read_prepare_data() -> pd.DataFrame:
         '4': 'Others',
         '5': 'Theft',
         '6': 'Vandalism',
-        '7': '',
-        '8': ''
+        '7': 'Tyre Breakdown',
+        '8': 'Tyre Accident'
     }
 
     df_assistance['Reason Of Call Mapped'] = df_assistance['Reason Of Call'].map(mapping_roc)

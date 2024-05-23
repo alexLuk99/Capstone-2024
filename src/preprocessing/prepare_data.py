@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from loguru import logger
 from pathlib import Path
 
@@ -43,6 +45,7 @@ def read_prepare_data() -> pd.DataFrame:
     df_assistance['Day of Incident'] = df_assistance['Incident Date']
     df_assistance['Incident Date'] = df_assistance['Incident Date'] + pd.to_timedelta(
         df_assistance['Time Of Call'] + ':00')
+    df_assistance['Incident Date'] = pd.to_datetime(df_assistance['Incident Date'])
 
     # todo
     #   check again -> many values can not be processed
@@ -106,22 +109,23 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop = df_workshop.convert_dtypes()
     df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%Y%m%d')
 
+    # Konvertiere Datumsangaben in datetime-Objekte
+    df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'])
+
     df_workshop.convert_dtypes()
     df_workshop.to_csv(interim_path / 'workshop.csv', index=False)
 
-    filtered_df.convert_dtypes()
-    filtered_df.to_csv('data/interim/filtered.csv', index=False)
+    logger.info('Prepare workshop file ... done')
+    logger.info('Start matching files ...')
 
-
+    # filtered_df.convert_dtypes()
+    # filtered_df.to_csv('data/interim/filtered.csv', index=False)
 
     # Merging Assistance Workshop
 
-    # Konvertiere Datumsangaben in datetime-Objekte
-    df_assistance['Incident Date'] = pd.to_datetime(df_assistance['Incident Date'])
-    df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'])
-
     # Mergen der DataFrames basierend auf VIN und FIN
-    merged_df = pd.merge(df_assistance, df_workshop, left_on='VIN', right_on='FIN', suffixes=('_df_assistance', '_df_workshop'))
+    merged_df = pd.merge(df_assistance, df_workshop, left_on='VIN', right_on='FIN',
+                         suffixes=('_df_assistance', '_df_workshop'))
 
     # Anwenden der Toleranzbedingungen
     tolerance_days = 14  # 2 Wochen
@@ -135,20 +139,7 @@ def read_prepare_data() -> pd.DataFrame:
     matched_df.convert_dtypes()
     matched_df.to_csv('data/interim/matched.csv', index=False)
 
+    logger.info('Matched files ... Done')
 
-
-
+    # ToDo
     # Überpürfen ob Reparaturdaten bei Werkstattaufenthalten identisch sind (Marcs Idee)
-
-    df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'])
-
-
-
-
-
-
-    logger.info('Prepare workshop file ... done')
-
-    # Merge files if possible (don't think we can tbh)
-
-    # Return either single file or both in a dataclass

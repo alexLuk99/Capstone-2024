@@ -10,7 +10,7 @@ def most_common_word(data: pd.DataFrame, output_path: Path) -> None:
 
     # Fault description Wörter
     # Einlesen der Stopwords aus der CSV-Datei
-    stopwords_df = pd.read_csv('data/interim/stopwords.csv')
+    stopwords_df = pd.read_csv('utils/stopwords.csv')
     # print("Spaltennamen der Stopwords CSV-Datei:", stopwords_df.columns.tolist())
 
     # Angenommen, die Stopwords sind in einer Spalte mit dem Namen 'stopwords' enthalten

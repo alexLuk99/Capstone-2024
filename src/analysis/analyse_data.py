@@ -51,10 +51,11 @@ def analyse_data() -> None:
     # Abhängigkeit zwischen Component, Outcome und Services darstellen
     component_outcome_services(data=df_assistance, output_path=output_path)
 
-    # Jan
+    # Erstellen von Maps
     create_country_choropleth(df=df_assistance, column='Country Of Origin', title='Number of permits')
     create_country_choropleth(df=df_assistance, column='Country Of Incident', title='Number of incidents')
 
+    # Chi Quadrat tests auf nominalen Attributen
     perform_chi_square_test(data=df_assistance, col1='Component', col2='Outcome Description')
     perform_chi_square_test(data=df_assistance, col1='Component', col2='Reason Of Call')
     perform_chi_square_test(data=df_assistance, col1='Outcome Description', col2='Reason Of Call')

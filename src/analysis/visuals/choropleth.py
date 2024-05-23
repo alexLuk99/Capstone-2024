@@ -21,7 +21,7 @@ def create_country_choropleth(df: pd.DataFrame, column: str, title: str) -> None
     country_counts['Country Name'] = country_counts['Country'].map(country_codes, na_action='ignore')
 
     choropleth = alt.Chart(alt.Data(values=europe_geojson['features'])).mark_geoshape(stroke='white').encode(
-        color=alt.Color('Count:Q', scale=alt.Scale(scheme='tealblues'), legend=alt.Legend(title='Number of VINs')),
+        color=alt.Color('Count:Q', scale=alt.Scale(scheme='tealblues', type='log'), legend=alt.Legend(title='Number of VINs')),
         tooltip=[
             alt.Tooltip('properties.NAME:N', title='Country'),
             alt.Tooltip('Count:Q', title='Number of IDs')

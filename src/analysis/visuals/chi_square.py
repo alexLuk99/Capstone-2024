@@ -68,6 +68,7 @@ def visualize_chi_square_test(data: pd.DataFrame, col1: str, col2: str, chi2: fl
             x=f'{col1}:O',
             y=f'{col2}:O',
             color=alt.Color(f'{column}:Q', scale=alt.Scale(scheme='blues')),
+            scale=alt.Scale(type='log'),
             tooltip=[f'{col1}', f'{col2}', f'{column}', f'{_tmp1}', f'{_tmp2}']
         ).properties(
             title={
@@ -101,6 +102,7 @@ def _get_count_chart(data: pd.DataFrame, col1: str, col2: str) -> alt.Chart:
         x=alt.X(f'{col1}:N', title=f'{col1}'),
         y=alt.Y(f'{col2}:N', title=f'{col2}'),
         color=alt.Color(f'count:Q', title=f'Anzahl'),
+        scale=alt.Scale(type='log'),
         tooltip=[
             alt.Tooltip(title=f'{col1}', field=f'{col1}'),
             alt.Tooltip(title=f'{col2}', field=f'{col2}'),

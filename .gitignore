@@ -1,7 +1,7 @@
 # Ignore the raw files to be NDA conform
 data
 #*.csv
-*.xlsx
+#*.xlsx
 *.html
 
 # Ignore IDE/Editor specific files

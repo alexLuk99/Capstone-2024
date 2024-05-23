@@ -18,6 +18,15 @@ def format_time(time_str):
     return pd.NA
 
 
+# Function to generate Fall_ID which is a unique identifier for multiple calls from the same VIN in a span of 5 working
+# days (+1 day buffer in case weekend or bank holidays)
+def generate_fall_id(group):
+    group = group.sort_values('Incident Date')
+    group['Fall_Number'] = (group['Incident Date'].diff().dt.days > 6).cumsum() + 1
+    group['Fall_ID'] = group['VIN'] + '_' + group['Fall_Number'].astype(str)
+    return group
+
+
 def read_prepare_data() -> pd.DataFrame:
     # Read and prepare assistance file
     # column Monat and License Plate are missing in sheet 2023
@@ -143,9 +152,12 @@ def read_prepare_data() -> pd.DataFrame:
     # Policy Duration
     # ToDo: Alle Daten mit Policy Start Date vor Gründung von Porsche Assistance mit pd.NaT ersetzen
     # Porsche Assistance has a maximum duration of 3 years, so all Policy End Dates which are greater than 01.01.2027 are unrealistic
-    df_assistance.loc[df_assistance['Policy Start Date'] < pd.to_datetime('2002-01-01', format='%Y-%m-%d'), 'Policy Start Date'] = pd.NaT
-    df_assistance.loc[df_assistance['Policy End Date'] >= pd.to_datetime('2027-01-01', format='%Y-%m-%d'), 'Policy End Date'] = pd.NaT
-    df_assistance.loc[df_assistance['Policy End Date'] <= df_assistance['Policy Start Date'], 'Policy End Date'] = pd.NaT
+    df_assistance.loc[df_assistance['Policy Start Date'] < pd.to_datetime('2002-01-01',
+                                                                          format='%Y-%m-%d'), 'Policy Start Date'] = pd.NaT
+    df_assistance.loc[
+        df_assistance['Policy End Date'] >= pd.to_datetime('2027-01-01', format='%Y-%m-%d'), 'Policy End Date'] = pd.NaT
+    df_assistance.loc[
+        df_assistance['Policy End Date'] <= df_assistance['Policy Start Date'], 'Policy End Date'] = pd.NaT
 
     df_assistance['Policy Duration'] = df_assistance['Policy End Date'] - df_assistance['Policy Start Date']
     df_assistance.loc[df_assistance['Policy Duration'] <= pd.Timedelta(0), 'Policy Duration'] = pd.NaT
@@ -176,6 +188,9 @@ def read_prepare_data() -> pd.DataFrame:
     # Write processed assistance file
     df_assistance = df_assistance.convert_dtypes()
     df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
+
+    # Apply generate_fall_id function
+    df_assistance = df_assistance.groupby(by='VIN', as_index=False).apply(generate_fall_id)
 
     logger.info('Prepare assistance report ... done')
     logger.info('Prepare workshop file ...')

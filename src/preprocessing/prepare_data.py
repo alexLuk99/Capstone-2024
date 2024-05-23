@@ -1,9 +1,21 @@
 from datetime import timedelta
 
+import re
+import numpy as np
 from loguru import logger
 from pathlib import Path
+import numpy as np
 
 import pandas as pd
+
+
+def format_time(time_str):
+    if pd.isna(time_str):
+        return time_str
+    match = re.match(r'^(\d{1,2}):(\d{2})$', time_str)
+    if match:
+        return match.group(1).zfill(2) + ':' + match.group(2) + ':00'
+    return pd.NA
 
 
 def read_prepare_data() -> pd.DataFrame:
@@ -39,13 +51,23 @@ def read_prepare_data() -> pd.DataFrame:
     # Drop duplicates over whole dataset (however, there are duplicate case numbers)
     df_assistance = df_assistance.drop_duplicates()
 
-    # Convert Incident Date to DateTime and add time from Time of Call
-
+    # Convert Incident Date and Time of Arrival to DateTime and add time from Time of Call or Time of Arrival
     df_assistance['Incident Date'] = pd.to_datetime(df_assistance['Incident Date'], format='%d/%m/%Y')
-    df_assistance['Day of Incident'] = df_assistance['Incident Date']
+    df_assistance['Time Of Arrival'] = df_assistance['Time Of Arrival'].replace({'0': pd.NA})
+    df_assistance['Time Of Arrival'] = df_assistance['Time Of Arrival'].replace({'00:00': pd.NA})
+    df_assistance['Time Of Arrival'] = df_assistance['Time Of Arrival'].apply(format_time)
+
+    df_assistance.loc[~df_assistance['Time Of Arrival'].isna(), 'Time Of Arrival'] = df_assistance.loc[~df_assistance[
+        'Time Of Arrival'].isna(), 'Incident Date'] + pd.to_timedelta(
+        df_assistance.loc[~df_assistance['Time Of Arrival'].isna(), 'Time Of Arrival'])
+    df_assistance['Time Of Arrival'] = pd.to_datetime(df_assistance['Time Of Arrival'])
     df_assistance['Incident Date'] = df_assistance['Incident Date'] + pd.to_timedelta(
         df_assistance['Time Of Call'] + ':00')
-    df_assistance['Incident Date'] = pd.to_datetime(df_assistance['Incident Date'])
+
+    # replace CTA with our calculated difference between Time Of Arrival and Incident Date
+    df_assistance['CTA'] = df_assistance['Time Of Arrival'] - df_assistance['Incident Date']
+    df_assistance.loc[df_assistance['CTA'] <= pd.Timedelta(0), 'CTA'] = pd.NaT
+    df_assistance['CTA'] = (df_assistance['CTA'].dt.total_seconds() // 60).fillna(0).astype('Int64').replace(0, pd.NA)
 
     # todo
     #   check again -> many values can not be processed
@@ -81,17 +103,71 @@ def read_prepare_data() -> pd.DataFrame:
     df_assistance = df_assistance.drop(columns=['Reason Of Call'])
     df_assistance = df_assistance.rename(columns={'Reason Of Call Mapped': 'Reason Of Call'})
 
-    # Odomoter aufbereiten, negative Werte, Werte unter 100km, und Werte über 100.000km werden mit pd.NA ersetzt
-    df_assistance['Odometer'] = pd.to_numeric(df_assistance['Odometer'], errors='coerce')
-    df_assistance.loc[(df_assistance['Odometer'] <= 100) | (df_assistance['Odometer'] >= 999_999), 'Odometer'] = pd.NA
+    # Odometer cleaning
+    # Q&A 3 -> max plausible Odometer is 260_000
+    df_assistance.loc[df_assistance['Odometer'] < 50, 'Odometer'] = np.nan
+    df_assistance.loc[df_assistance['Odometer'] > 260_000, 'Odometer'] = np.nan
 
-    # Anrufe vom gleichen Fahrzeug am gleichen Tag werden nur einmal mitgenommen
-    df_assistance = df_assistance.sort_values(by='Incident Date')
-    df_assistance_filtered = df_assistance.drop_duplicates(subset=['VIN', 'Day of Incident'])
+    # Mapping vehicle model & Merge
+    mapping_vehicle_model = pd.read_excel('utils/mapping/vehicle_model.xlsx')
+    mapping_vehicle_model = mapping_vehicle_model.drop(columns=['Bestelltyp'])
+    mapping_vehicle_model = mapping_vehicle_model.drop_duplicates()  # No good mapping from Porsche they have duplicates
+    mapping_vehicle_model = mapping_vehicle_model.astype(str)
+    btypes = mapping_vehicle_model['Bestelltypschlüssel'].unique().tolist()
 
-    # df_assistance_filtered['14_day_window'] = df_assistance_filtered.groupby('VIN')['Incident Date'].diff().dt.days <= 14
-    # multiple_calls = df_assistance_filtered[df_assistance_filtered['14_day_window']].groupby('VIN').size().reset_index(name='counts')
-    # multiple_calls = multiple_calls[multiple_calls['counts'] > 1]
+    df_assistance.loc[~df_assistance['Btype'].isin(btypes), 'Btype'] = pd.NA
+
+    df_assistance_btype_na = df_assistance[df_assistance['Btype'].isna()].convert_dtypes()
+    df_assistance_btype_not_na = df_assistance[~df_assistance['Btype'].isna()].convert_dtypes()
+
+    # Merge on Btype
+    df_assistance_merge_on_btype = df_assistance_btype_not_na.merge(mapping_vehicle_model, left_on='Btype',
+                                                                    right_on='Bestelltypschlüssel', how='left')
+
+    # Merge on VIN
+    mapping_vehicle_model_typ_aus_VIN = mapping_vehicle_model.copy()
+    mapping_vehicle_model_typ_aus_VIN[['Bestelltypschlüssel', 'Fahrzeuggruppe']] = pd.NA
+    mapping_vehicle_model_typ_aus_VIN = mapping_vehicle_model_typ_aus_VIN.drop_duplicates()
+    mapping_vehicle_model_typ_aus_VIN = mapping_vehicle_model_typ_aus_VIN.astype(str)
+    df_assistance_merge_on_typ_aus_VIN = df_assistance_btype_na.merge(mapping_vehicle_model_typ_aus_VIN,
+                                                                      left_on='Typ aus VIN', right_on='Baureihe',
+                                                                      how='left')
+
+    df_assistance = pd.concat([df_assistance_merge_on_btype, df_assistance_merge_on_typ_aus_VIN], ignore_index=True)
+    df_assistance[['Bestelltypschlüssel', 'Modellreihe', 'Baureihe', 'Fahrzeuggruppe']] = df_assistance[
+        ['Bestelltypschlüssel', 'Modellreihe', 'Baureihe', 'Fahrzeuggruppe']].replace({np.nan: pd.NA})
+
+    # Rename
+    df_assistance = df_assistance.rename(columns={'Replacement Car Days': 'Rental Car Days'})
+
+    # Policy Duration
+    # ToDo: Alle Daten mit Policy Start Date vor Gründung von Porsche Assistance mit pd.NaT ersetzen
+    # Porsche Assistance has a maximum duration of 3 years, so all Policy End Dates which are greater than 01.01.2027 are unrealistic
+    df_assistance.loc[df_assistance['Policy Start Date'] < pd.to_datetime('2002-01-01', format='%Y-%m-%d'), 'Policy Start Date'] = pd.NaT
+    df_assistance.loc[df_assistance['Policy End Date'] >= pd.to_datetime('2027-01-01', format='%Y-%m-%d'), 'Policy End Date'] = pd.NaT
+    df_assistance.loc[df_assistance['Policy End Date'] <= df_assistance['Policy Start Date'], 'Policy End Date'] = pd.NaT
+
+    df_assistance['Policy Duration'] = df_assistance['Policy End Date'] - df_assistance['Policy Start Date']
+    df_assistance.loc[df_assistance['Policy Duration'] <= pd.Timedelta(0), 'Policy Duration'] = pd.NaT
+
+    # drop Typ aus VIN, Btype, Vehicle Model as they are now duplicated
+    # drop other columns like free text columns, columns no longer used (Personal Services)
+    df_assistance = df_assistance.drop(columns=['Typ aus VIN', 'Btype', 'Vehicle Model', 'Monat',
+                                                'Fault Description Customer', 'License Plate', 'Model Year',
+                                                'Towing Distance', 'Repairing Dealer Code', 'Replacement Car Brand',
+                                                'Replacement Car Type', 'Replacement Car Delivered By',
+                                                'Personal Services', 'Additional Services Not Covered Description',
+                                                'Result Courtesy Call', 'Reason Courtesy Call',
+                                                'Time Of Completion Minutes', 'Time Of Call'])
+
+    sort = ['Case Number', 'VIN', 'Report Type', 'Incident Date', 'Registration Date', 'Policy Start Date',
+            'Policy End Date', 'Policy Duration', 'Country Of Origin', 'Country Of Incident', 'Handling Call Center',
+            'Bestelltypschlüssel', 'Baureihe', 'Modellreihe', 'Fahrzeuggruppe', 'Odometer', 'Time Of Arrival', 'CTA',
+            'Component', 'Outcome Description', 'Reason Of Call']
+
+    _ = [sort.append(x) for x in df_assistance.columns if x not in sort]
+
+    df_assistance = df_assistance[sort]
 
     # create interim path
     interim_path = Path('data/interim')

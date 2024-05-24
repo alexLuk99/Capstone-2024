@@ -230,13 +230,42 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop = df_workshop.convert_dtypes()
     df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%Y%m%d')
 
+    # Drop duplicated Q-Line entries (623) -> in Q&A4 abgenommen
+    df_workshop = df_workshop.drop_duplicates(subset=['Q-Line'])
+
     # Rename FIN in VIN
     df_workshop = df_workshop.rename(columns={'FIN': 'VIN'})
 
-    # Group repairs
-    df_workshop = df_workshop.sort_values(by=['VIN', 'Reparaturbeginndatum'])
+    # Sort the DataFrame by VIN and repair start date and calculate the difference between repair start dates
+    df_workshop = df_workshop.sort_values(by=['VIN', 'Reparaturbeginndatum']).reset_index(drop=True)
     df_workshop['Time_Diff'] = df_workshop.groupby('VIN')['Reparaturbeginndatum'].diff().dt.days
 
+    # Identify where the workshop stay is the same or the difference in days is <= 7
+    df_workshop['Same_Werkstattaufenthalt'] = df_workshop['Werkstattaufenthalt'] == df_workshop.groupby('VIN')[
+        'Werkstattaufenthalt'].shift()
+    df_workshop['Within_7_Days'] = df_workshop['Time_Diff'] <= 7
+
+    # Replace NA values with False
+    df_workshop['Same_Werkstattaufenthalt'] = df_workshop['Same_Werkstattaufenthalt'].fillna(False)
+    df_workshop['Within_7_Days'] = df_workshop['Within_7_Days'].fillna(False)
+
+    # Identify new stays based on the conditions
+    df_workshop['New_Stay'] = ~(df_workshop['Same_Werkstattaufenthalt'] | df_workshop['Within_7_Days'])
+
+    # Keep track of VIN changes
+    df_workshop['VIN_Change'] = df_workshop['VIN'] != df_workshop['VIN'].shift()
+
+    # New stays are also marked by a VIN change
+    df_workshop['New_Stay'] = df_workshop['New_Stay'] | df_workshop['VIN_Change']
+
+    # Calculate the Aufenthalt_ID by cumulatively summing the new stays
+    df_workshop['Aufenthalt_ID'] = df_workshop.groupby('VIN')['New_Stay'].cumsum()
+
+    # Remove the temporary columns
+    df_workshop = df_workshop.drop(columns=['Time_Diff', 'Same_Werkstattaufenthalt', 'Within_7_Days', 'New_Stay', 'VIN_Change'])
+
+    # Add VIN to Aufenthalt_ID
+    df_workshop['Aufenthalt_ID'] = df_workshop['VIN'] + '_' + df_workshop['Aufenthalt_ID'].astype('string')
 
     df_workshop.convert_dtypes()
     df_workshop.to_csv(interim_path / 'workshop.csv', index=False)
@@ -244,26 +273,31 @@ def read_prepare_data() -> pd.DataFrame:
     logger.info('Prepare workshop file ... done')
     logger.info('Start matching files ...')
 
+    # ToDo: Merge df_assistance und df_workshop
+    # Kann man es eingrenzen nur auf Einträge in df_assistance wo Outcome Description Towing or Scheduled Towing ist
+    # und in df_workshop Liegenbleiber_Flag == 1? Damit dann eine Fall_ID == Aufenthalt_ID Beziehung aufbauen um alle
+    # Einträge in den gegenseitigen Tabellen mergen
+
     # filtered_df.convert_dtypes()
     # filtered_df.to_csv('data/interim/filtered.csv', index=False)
 
     # Merging Assistance Workshop
 
     # Mergen der DataFrames basierend auf VIN und FIN
-    merged_df = pd.merge(df_assistance, df_workshop, left_on='VIN', right_on='FIN',
-                         suffixes=('_df_assistance', '_df_workshop'))
-
-    # Anwenden der Toleranzbedingungen
-    tolerance_days = 14  # 2 Wochen
-    tolerance_km = 100
-
-    matched_df = merged_df[
-        (abs(merged_df['Incident Date'] - merged_df['Reparaturbeginndatum']) <= timedelta(days=tolerance_days)) &
-        (abs(merged_df['Odometer'] - merged_df['Kilometerstand Reparatur']) <= tolerance_km)
-        ]
-
-    matched_df.convert_dtypes()
-    matched_df.to_csv('data/interim/matched.csv', index=False)
+    # merged_df = pd.merge(df_assistance, df_workshop, left_on='VIN', right_on='FIN',
+    #                      suffixes=('_df_assistance', '_df_workshop'))
+    #
+    # # Anwenden der Toleranzbedingungen
+    # tolerance_days = 14  # 2 Wochen
+    # tolerance_km = 100
+    #
+    # matched_df = merged_df[
+    #     (abs(merged_df['Incident Date'] - merged_df['Reparaturbeginndatum']) <= timedelta(days=tolerance_days)) &
+    #     (abs(merged_df['Odometer'] - merged_df['Kilometerstand Reparatur']) <= tolerance_km)
+    #     ]
+    #
+    # matched_df.convert_dtypes()
+    # matched_df.to_csv('data/interim/matched.csv', index=False)
 
     logger.info('Matched files ... Done')
 

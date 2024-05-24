@@ -181,6 +181,39 @@ def read_prepare_data() -> pd.DataFrame:
 
     df_assistance = df_assistance[sort]
 
+    # The following lines add a new column "Fall_ID" to the df_assistance dataset which can be used as "unique"
+    # Identifier to find pairs/groups of calls which happened in a short timespan of each other (6 days) and be regarded
+    # as belonging to the same problem with car. Only if multiple calls in the span of 6 days have the outcome
+    # description "Towing" or "Scheduled Towing", they receive a new "Fall_ID". After every towing a car should be in a
+    # workshop (thus every "Fall_ID" with the Outcome Description "Towing" or "Scheduled Towing" should have an entry
+    # (or multiple entries) in the workshop file). Following this, only Fall_IDs with "Towing" or "Scheduled Towing" for
+    # their last entry can be merged with df_workshop
+
+    # Sort the DataFrame by VIN and Incident Date
+    df_assistance = df_assistance.sort_values(by=['VIN', 'Incident Date'])
+
+    # Calculate the difference in days between consecutive incident dates
+    df_assistance['Time_Diff'] = df_assistance.groupby('VIN')['Incident Date'].diff().dt.days
+
+    # Identify new falls (cases) where the time difference exceeds 6 days
+    df_assistance['New_Fall'] = (df_assistance['Time_Diff'] > 6) | (df_assistance['Time_Diff'].isna())
+
+    # Identify where the outcome description is "Towing" or "Scheduled Towing"
+    towing_condition = df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])
+
+    # Mark the next case after a towing condition within 6 days as a new fall
+    df_assistance['New_Fall'] = df_assistance['New_Fall'] | (
+                towing_condition.shift(fill_value=False) & (df_assistance['Time_Diff'] <= 6))
+
+    # Calculate the cumulative sum of new falls to assign unique fall numbers within each VIN group
+    df_assistance['Fall_Number'] = df_assistance.groupby('VIN')['New_Fall'].cumsum()
+
+    # Create the Fall_ID column
+    df_assistance['Fall_ID'] = df_assistance['VIN'] + '_' + df_assistance['Fall_Number'].astype(str)
+
+    # Drop the temporary columns
+    df_assistance = df_assistance.drop(columns=['Time_Diff', 'New_Fall', 'Fall_Number'])
+
     # create interim path
     interim_path = Path('data/interim')
     interim_path.mkdir(parents=True, exist_ok=True)
@@ -188,9 +221,6 @@ def read_prepare_data() -> pd.DataFrame:
     # Write processed assistance file
     df_assistance = df_assistance.convert_dtypes()
     df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
-
-    # Apply generate_fall_id function
-    df_assistance = df_assistance.groupby(by='VIN', as_index=False).apply(generate_fall_id)
 
     logger.info('Prepare assistance report ... done')
     logger.info('Prepare workshop file ...')
@@ -200,8 +230,13 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop = df_workshop.convert_dtypes()
     df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%Y%m%d')
 
-    # Konvertiere Datumsangaben in datetime-Objekte
-    df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'])
+    # Rename FIN in VIN
+    df_workshop = df_workshop.rename(columns={'FIN': 'VIN'})
+
+    # Group repairs
+    df_workshop = df_workshop.sort_values(by=['VIN', 'Reparaturbeginndatum'])
+    df_workshop['Time_Diff'] = df_workshop.groupby('VIN')['Reparaturbeginndatum'].diff().dt.days
+
 
     df_workshop.convert_dtypes()
     df_workshop.to_csv(interim_path / 'workshop.csv', index=False)

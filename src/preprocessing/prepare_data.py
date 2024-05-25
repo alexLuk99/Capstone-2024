@@ -27,6 +27,25 @@ def generate_fall_id(group):
     return group
 
 
+def merge_with_tolerance(df1, df2, vin_col, date_col1, date_col2, tolerance_days):
+    # Add a key column with the same value to facilitate Cartesian join
+    df1['key'] = 1
+    df2['key'] = 1
+
+    # Perform a Cartesian join using the key column
+    merged = pd.merge(df1, df2, on='key').drop('key', axis=1)
+
+    # Filter the merged dataframe based on the VIN and the date range conditions
+    merged = merged[(merged[vin_col + '_x'] == merged[vin_col + '_y']) &
+                    (merged[date_col1] <= merged[date_col2]) &
+                    (merged[date_col2] <= merged[date_col1] + pd.Timedelta(days=tolerance_days))]
+
+    # Drop duplicate VIN and date columns for clarity
+    merged = merged.drop(columns=[vin_col + '_y', date_col1, date_col2])
+
+    return merged
+
+
 def read_prepare_data() -> pd.DataFrame:
     # Read and prepare assistance file
     # column Monat and License Plate are missing in sheet 2023
@@ -203,7 +222,7 @@ def read_prepare_data() -> pd.DataFrame:
 
     # Mark the next case after a towing condition within 6 days as a new fall
     df_assistance['New_Fall'] = df_assistance['New_Fall'] | (
-                towing_condition.shift(fill_value=False) & (df_assistance['Time_Diff'] <= 6))
+            towing_condition.shift(fill_value=False) & (df_assistance['Time_Diff'] <= 6))
 
     # Calculate the cumulative sum of new falls to assign unique fall numbers within each VIN group
     df_assistance['Fall_Number'] = df_assistance.groupby('VIN')['New_Fall'].cumsum()
@@ -262,7 +281,8 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop['Aufenthalt_ID'] = df_workshop.groupby('VIN')['New_Stay'].cumsum()
 
     # Remove the temporary columns
-    df_workshop = df_workshop.drop(columns=['Time_Diff', 'Same_Werkstattaufenthalt', 'Within_7_Days', 'New_Stay', 'VIN_Change'])
+    df_workshop = df_workshop.drop(
+        columns=['Time_Diff', 'Same_Werkstattaufenthalt', 'Within_7_Days', 'New_Stay', 'VIN_Change'])
 
     # Add VIN to Aufenthalt_ID
     df_workshop['Aufenthalt_ID'] = df_workshop['VIN'] + '_' + df_workshop['Aufenthalt_ID'].astype('string')
@@ -272,6 +292,26 @@ def read_prepare_data() -> pd.DataFrame:
 
     logger.info('Prepare workshop file ... done')
     logger.info('Start matching files ...')
+
+    df_assistance_filtered = df_assistance[
+        df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])].copy()
+
+    df_assistance_filtered['Incident Date Datum'] = df_assistance_filtered['Incident Date'].dt.normalize()
+
+    df_assistance_filtered = df_assistance_filtered.sort_values(by=['Incident Date Datum', 'VIN']).reset_index(drop=True)
+    df_workshop = df_workshop.sort_values(by=['Reparaturbeginndatum','VIN']).reset_index(drop=True)
+
+    merged_df = pd.merge_asof(df_assistance_filtered, df_workshop, left_on='Incident Date Datum',
+                              right_on='Reparaturbeginndatum', by='VIN', direction='forward',
+                              tolerance=pd.Timedelta(days=7))
+
+    # Does not always work (ex. VIN 648245833f7a24a77)
+    merged_df_1 = merged_df[
+        ['Case Number', 'VIN', 'Incident Date Datum', 'Reparaturbeginndatum', 'Fall_ID', 'Aufenthalt_ID', 'Q-Line',
+         'Werkstattaufenthalt', 'Händler Q-Line']].copy()
+
+    merged_df = merge_with_tolerance(df_assistance_filtered, df_workshop, 'VIN', 'Incident Date',
+                                     'Reperaturbeginndatum', 7)
 
     # ToDo: Merge df_assistance und df_workshop
     # Kann man es eingrenzen nur auf Einträge in df_assistance wo Outcome Description Towing or Scheduled Towing ist

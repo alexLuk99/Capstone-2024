@@ -313,16 +313,16 @@ merged_df = pd.merge_asof(df_assistance_filtered, df_workshop, left_on='Incident
 
 
 
-merged_df = merge_with_tolerance(df_assistance_filtered, df_workshop, 'VIN', 'Incident Date',
-                                     'Reperaturbeginndatum', 7)
+
 
 # Does not always work (ex. VIN 648245833f7a24a77)
 merged_df_1 = merged_df
 ['Case Number', 'VIN', 'Incident Date Datum', 'Reparaturbeginndatum', 'Fall_ID', 'Aufenthalt_ID', 'Q-Line',
  'Werkstattaufenthalt', 'Händler Q-Line'].copy()
 
-A = 12313 + 222
-StoppDF = pd.DataFrame()
+merged_df = merge_with_tolerance(df_assistance_filtered, df_workshop, 'VIN', 'Incident Date',
+                                     'Reperaturbeginndatum', 7)
+
 
     # ToDo: Merge df_assistance und df_workshop
     # Kann man es eingrenzen nur auf Einträge in df_assistance wo Outcome Description Towing or Scheduled Towing ist

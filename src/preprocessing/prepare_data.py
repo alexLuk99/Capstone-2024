@@ -208,36 +208,35 @@ def read_prepare_data() -> pd.DataFrame:
     # (or multiple entries) in the workshop file). Following this, only Fall_IDs with "Towing" or "Scheduled Towing" for
     # their last entry can be merged with df_workshop
 
-    # Sort the DataFrame by VIN and Incident Date
+
+    # Sortieren des DataFrames
     df_assistance = df_assistance.sort_values(by=['VIN', 'Incident Date'])
 
-    # Calculate the difference in days between consecutive incident dates
+    # Berechnung des Zeitunterschieds
     df_assistance['Time_Diff'] = df_assistance.groupby('VIN')['Incident Date'].diff().dt.days
 
-    # Identify new falls (cases) where the time difference exceeds 6 days
+    # Identifizierung neuer Fälle
     df_assistance['New_Fall'] = (df_assistance['Time_Diff'] > 6) | (df_assistance['Time_Diff'].isna())
 
-    # Identify where the outcome description is "Towing" or "Scheduled Towing"
+    # Bedingung für "Towing" oder "Scheduled Towing"
     towing_condition = df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])
 
-    # Mark the next case after a towing condition within 6 days as a new fall
-    df_assistance['New_Fall'] = df_assistance['New_Fall'] | (
-            towing_condition.shift(fill_value=False) & (df_assistance['Time_Diff'] <= 6))
+    # Markieren des nächsten Eintrags nach "Towing" oder "Scheduled Towing" als neuer Fall
+    df_assistance.loc[towing_condition.shift(fill_value=False), 'New_Fall'] = True
 
-    # Calculate the cumulative sum of new falls to assign unique fall numbers within each VIN group
+    # Kumulative Summe der neuen Fälle
     df_assistance['Fall_Number'] = df_assistance.groupby('VIN')['New_Fall'].cumsum()
 
-    # Create the Fall_ID column
+    # Erstellen der Fall_ID
     df_assistance['Fall_ID'] = df_assistance['VIN'] + '_' + df_assistance['Fall_Number'].astype(str)
 
-    # Drop the temporary columns
+    # Entfernen temporärer Spalten
     df_assistance = df_assistance.drop(columns=['Time_Diff', 'New_Fall', 'Fall_Number'])
 
-    # create interim path
+    # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path = Path('data/interim')
     interim_path.mkdir(parents=True, exist_ok=True)
 
-    # Write processed assistance file
     df_assistance = df_assistance.convert_dtypes()
     df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
 
@@ -290,28 +289,40 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop.convert_dtypes()
     df_workshop.to_csv(interim_path / 'workshop.csv', index=False)
 
+
+
+
     logger.info('Prepare workshop file ... done')
     logger.info('Start matching files ...')
 
     df_assistance_filtered = df_assistance[
-        df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])].copy()
+    df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])].copy()
 
     df_assistance_filtered['Incident Date Datum'] = df_assistance_filtered['Incident Date'].dt.normalize()
 
     df_assistance_filtered = df_assistance_filtered.sort_values(by=['Incident Date Datum', 'VIN']).reset_index(drop=True)
     df_workshop = df_workshop.sort_values(by=['Reparaturbeginndatum','VIN']).reset_index(drop=True)
 
-    merged_df = pd.merge_asof(df_assistance_filtered, df_workshop, left_on='Incident Date Datum',
+
+merged_df = pd.DataFrame()
+merged_df = pd.merge_asof(df_assistance_filtered, df_workshop, left_on='Incident Date Datum',
                               right_on='Reparaturbeginndatum', by='VIN', direction='forward',
                               tolerance=pd.Timedelta(days=7))
 
-    # Does not always work (ex. VIN 648245833f7a24a77)
-    merged_df_1 = merged_df[
-        ['Case Number', 'VIN', 'Incident Date Datum', 'Reparaturbeginndatum', 'Fall_ID', 'Aufenthalt_ID', 'Q-Line',
-         'Werkstattaufenthalt', 'Händler Q-Line']].copy()
 
-    merged_df = merge_with_tolerance(df_assistance_filtered, df_workshop, 'VIN', 'Incident Date',
+
+
+
+merged_df = merge_with_tolerance(df_assistance_filtered, df_workshop, 'VIN', 'Incident Date',
                                      'Reperaturbeginndatum', 7)
+
+# Does not always work (ex. VIN 648245833f7a24a77)
+merged_df_1 = merged_df
+['Case Number', 'VIN', 'Incident Date Datum', 'Reparaturbeginndatum', 'Fall_ID', 'Aufenthalt_ID', 'Q-Line',
+ 'Werkstattaufenthalt', 'Händler Q-Line'].copy()
+
+A = 12313 + 222
+StoppDF = pd.DataFrame()
 
     # ToDo: Merge df_assistance und df_workshop
     # Kann man es eingrenzen nur auf Einträge in df_assistance wo Outcome Description Towing or Scheduled Towing ist
@@ -339,7 +350,11 @@ def read_prepare_data() -> pd.DataFrame:
     # matched_df.convert_dtypes()
     # matched_df.to_csv('data/interim/matched.csv', index=False)
 
-    logger.info('Matched files ... Done')
+
+
+
+logger.info('Matched files ... Done')
+
 
     # ToDo
     # Überpürfen ob Reparaturdaten bei Werkstattaufenthalten identisch sind (Marcs Idee)

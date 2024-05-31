@@ -208,7 +208,6 @@ def read_prepare_data() -> pd.DataFrame:
     # (or multiple entries) in the workshop file). Following this, only Fall_IDs with "Towing" or "Scheduled Towing" for
     # their last entry can be merged with df_workshop
 
-
     # Sortieren des DataFrames
     df_assistance = df_assistance.sort_values(by=['VIN', 'Incident Date'])
 
@@ -289,40 +288,61 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop.convert_dtypes()
     df_workshop.to_csv(interim_path / 'workshop.csv', index=False)
 
-
-
-
     logger.info('Prepare workshop file ... done')
     logger.info('Start matching files ...')
 
     df_assistance_filtered = df_assistance[
-    df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])].copy()
+        df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])].copy()
 
     df_assistance_filtered['Incident Date Datum'] = df_assistance_filtered['Incident Date'].dt.normalize()
 
-    df_assistance_filtered = df_assistance_filtered.sort_values(by=['Incident Date Datum', 'VIN']).reset_index(drop=True)
-    df_workshop = df_workshop.sort_values(by=['Reparaturbeginndatum','VIN']).reset_index(drop=True)
+    df_assistance_filtered = df_assistance_filtered.sort_values(by=['Incident Date Datum', 'VIN']).reset_index(
+        drop=True)
+    df_workshop = df_workshop.sort_values(by=['Reparaturbeginndatum', 'VIN']).reset_index(drop=True)
 
-
-merged_df = pd.DataFrame()
-merged_df = pd.merge_asof(df_assistance_filtered, df_workshop, left_on='Incident Date Datum',
+    merged_df = pd.DataFrame()
+    merged_df = pd.merge_asof(df_assistance_filtered, df_workshop, left_on='Incident Date Datum',
                               right_on='Reparaturbeginndatum', by='VIN', direction='forward',
                               tolerance=pd.Timedelta(days=7))
 
+    # Does not always work (ex. VIN 648245833f7a24a77)
+    merged_df_1 = merged_df
+    ['Case Number', 'VIN', 'Incident Date Datum', 'Reparaturbeginndatum', 'Fall_ID', 'Aufenthalt_ID', 'Q-Line',
+     'Werkstattaufenthalt', 'Händler Q-Line'].copy()
 
-
-
-
-
-
-# Does not always work (ex. VIN 648245833f7a24a77)
-merged_df_1 = merged_df
-['Case Number', 'VIN', 'Incident Date Datum', 'Reparaturbeginndatum', 'Fall_ID', 'Aufenthalt_ID', 'Q-Line',
- 'Werkstattaufenthalt', 'Händler Q-Line'].copy()
-
-merged_df = merge_with_tolerance(df_assistance_filtered, df_workshop, 'VIN', 'Incident Date',
+    merged_df = merge_with_tolerance(df_assistance_filtered, df_workshop, 'VIN', 'Incident Date',
                                      'Reperaturbeginndatum', 7)
 
+    # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung der Top x-Prozent, mit boolenschen Wert
+
+    # Obere Prozentzahl
+    x = 10
+
+    # Zählen der Häufigkeit jedes eindeutigen Wertes in der Spalte "VIN"
+    vin_counts = df_assistance['VIN'].value_counts()
+
+    # Identifizieren der Schwelle für die obersten x%
+    threshold = vin_counts.quantile((100 - x) / 100)
+
+    # Erstellen einer Liste der VINs, die in die obersten x% fallen
+    top_percent_vins = vin_counts[vin_counts >= threshold].index
+
+    # Erstellen der neuen Spalte "SuS_Anruferzahl" mit dem booleschen Wert "yes" für die obersten x%
+    df_assistance['SuS_Anruferzahl'] = df_assistance['VIN'].apply(
+        lambda vin: 'yes' if vin in top_percent_vins else 'no')
+
+    # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung ob Incident Date an den Rändern des Policy Start und End Dates liegt, mit boolenschen Wert
+
+    # Definieren der Bedingungen
+    condition_start_date = (df_assistance['Incident Date'] >= df_assistance['Policy Start Date']) & \
+                           (df_assistance['Incident Date'] <= df_assistance['Policy Start Date'] + pd.Timedelta(
+                               days=21))
+
+    condition_end_date = (df_assistance['Incident Date'] >= df_assistance['Policy End Date'] - pd.Timedelta(days=21)) & \
+                         (df_assistance['Incident Date'] <= df_assistance['Policy End Date'] + pd.Timedelta(days=21))
+
+    # Erstellen der neuen Spalte "SuS_Vertragszeitraum"
+    df_assistance['SuS_Vertragszeitraum'] = (condition_start_date | condition_end_date).map({True: 'yes', False: 'no'})
 
     # ToDo: Merge df_assistance und df_workshop
     # Kann man es eingrenzen nur auf Einträge in df_assistance wo Outcome Description Towing or Scheduled Towing ist
@@ -351,10 +371,7 @@ merged_df = merge_with_tolerance(df_assistance_filtered, df_workshop, 'VIN', 'In
     # matched_df.to_csv('data/interim/matched.csv', index=False)
 
 
-
-
 logger.info('Matched files ... Done')
 
-
-    # ToDo
-    # Überpürfen ob Reparaturdaten bei Werkstattaufenthalten identisch sind (Marcs Idee)
+# ToDo
+# Überpürfen ob Reparaturdaten bei Werkstattaufenthalten identisch sind (Marcs Idee)

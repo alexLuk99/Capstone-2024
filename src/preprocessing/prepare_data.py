@@ -231,10 +231,9 @@ def read_prepare_data() -> pd.DataFrame:
 
     # Erstellen der neuen Spalte "SuS_Anruferzahl" mit dem booleschen Wert "yes" für die obersten x%
     df_assistance['SuS_Anruferzahl'] = df_assistance['VIN'].apply(
-        lambda vin: 'yes' if vin in top_percent_vins else 'no')
+        lambda vin: True if vin in top_percent_vins else False)
 
     # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung ob Incident Date an den Rändern des Policy Start und End Dates liegt, mit boolenschen Wert
-
     # Definieren der Bedingungen
     condition_start_date = (df_assistance['Incident Date'] >= df_assistance['Policy Start Date']) & \
                            (df_assistance['Incident Date'] <= df_assistance['Policy Start Date'] + pd.Timedelta(
@@ -244,8 +243,7 @@ def read_prepare_data() -> pd.DataFrame:
                          (df_assistance['Incident Date'] <= df_assistance['Policy End Date'] + pd.Timedelta(days=21))
 
     # Erstellen der neuen Spalte "SuS_Vertragszeitraum"
-    df_assistance['SuS_Vertragszeitraum'] = (condition_start_date | condition_end_date).map({True: 'yes', False: 'no'})
-
+    df_assistance['SuS_Vertragszeitraum'] = (condition_start_date | condition_end_date)
 
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path = Path('data/interim')

@@ -1,12 +1,10 @@
-from datetime import timedelta
-
 import re
-import numpy as np
 from loguru import logger
 from pathlib import Path
 import numpy as np
 
 import pandas as pd
+import altair as alt
 
 
 def format_time(time_str):
@@ -25,25 +23,6 @@ def generate_fall_id(group):
     group['Fall_Number'] = (group['Incident Date'].diff().dt.days > 6).cumsum() + 1
     group['Fall_ID'] = group['VIN'] + '_' + group['Fall_Number'].astype(str)
     return group
-
-
-def merge_with_tolerance(df1, df2, vin_col, date_col1, date_col2, tolerance_days):
-    # Add a key column with the same value to facilitate Cartesian join
-    df1['key'] = 1
-    df2['key'] = 1
-
-    # Perform a Cartesian join using the key column
-    merged = pd.merge(df1, df2, on='key').drop('key', axis=1)
-
-    # Filter the merged dataframe based on the VIN and the date range conditions
-    merged = merged[(merged[vin_col + '_x'] == merged[vin_col + '_y']) &
-                    (merged[date_col1] <= merged[date_col2]) &
-                    (merged[date_col2] <= merged[date_col1] + pd.Timedelta(days=tolerance_days))]
-
-    # Drop duplicate VIN and date columns for clarity
-    merged = merged.drop(columns=[vin_col + '_y', date_col1, date_col2])
-
-    return merged
 
 
 def read_prepare_data() -> pd.DataFrame:
@@ -92,13 +71,14 @@ def read_prepare_data() -> pd.DataFrame:
     df_assistance['Incident Date'] = df_assistance['Incident Date'] + pd.to_timedelta(
         df_assistance['Time Of Call'] + ':00')
 
+    # Drop duplicates over VIN and Incident Date
+    df_assistance = df_assistance.drop_duplicates(subset=['VIN', 'Incident Date'])
+
     # replace CTA with our calculated difference between Time Of Arrival and Incident Date
     df_assistance['CTA'] = df_assistance['Time Of Arrival'] - df_assistance['Incident Date']
     df_assistance.loc[df_assistance['CTA'] <= pd.Timedelta(0), 'CTA'] = pd.NaT
     df_assistance['CTA'] = (df_assistance['CTA'].dt.total_seconds() // 60).fillna(0).astype('Int64').replace(0, pd.NA)
 
-    # todo
-    #   check again -> many values can not be processed
     date_columns = ['Registration Date', 'Policy Start Date', 'Policy End Date']
     for column in date_columns:
         # one record with typo and value of 28/05/2921 in Registration Date
@@ -208,7 +188,6 @@ def read_prepare_data() -> pd.DataFrame:
     # (or multiple entries) in the workshop file). Following this, only Fall_IDs with "Towing" or "Scheduled Towing" for
     # their last entry can be merged with df_workshop
 
-
     # Sortieren des DataFrames
     df_assistance = df_assistance.sort_values(by=['VIN', 'Incident Date'])
 
@@ -289,72 +268,113 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop.convert_dtypes()
     df_workshop.to_csv(interim_path / 'workshop.csv', index=False)
 
-
-
-
     logger.info('Prepare workshop file ... done')
     logger.info('Start matching files ...')
 
     df_assistance_filtered = df_assistance[
-    df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])].copy()
+        df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])].copy()
 
     df_assistance_filtered['Incident Date Datum'] = df_assistance_filtered['Incident Date'].dt.normalize()
 
-    df_assistance_filtered = df_assistance_filtered.sort_values(by=['Incident Date Datum', 'VIN']).reset_index(drop=True)
-    df_workshop = df_workshop.sort_values(by=['Reparaturbeginndatum','VIN']).reset_index(drop=True)
+    df_assistance_filtered = df_assistance_filtered.sort_values(by=['Incident Date Datum', 'VIN']).reset_index(
+        drop=True)
+    df_workshop = df_workshop.sort_values(by=['Reparaturbeginndatum', 'VIN']).reset_index(drop=True)
+    df_workshop_filtered = df_workshop.drop_duplicates(subset=['Aufenthalt_ID'])
 
+    # Create a plot to see how many tolerance days are good to keep
+    # We decided on 7 after Porsche told us in Q&A4 that 5 days is acceptable, 7 days is with 2 days of buffer
+    # This is merge is only on assistance calls where the outcome description is towing or scheduled towing and only on
+    # workshop entries which are the first for our business logic of condensed repairs (Aufenthalt_ID)
+    results = []
+    for tolerance in range(1, 31):
+        tmp_merge = pd.merge_asof(df_assistance_filtered, df_workshop_filtered, left_on='Incident Date Datum',
+                                  right_on='Reparaturbeginndatum', by='VIN', direction='forward',
+                                  tolerance=pd.Timedelta(days=tolerance))
+        num_merges = len(tmp_merge[~tmp_merge['Aufenthalt_ID'].isna()])
 
-merged_df = pd.DataFrame()
-merged_df = pd.merge_asof(df_assistance_filtered, df_workshop, left_on='Incident Date Datum',
-                              right_on='Reparaturbeginndatum', by='VIN', direction='forward',
-                              tolerance=pd.Timedelta(days=7))
+        results.append({'Toleranz in Tagen': tolerance, 'Anzahl an Merges': num_merges})
 
+    results_df = pd.DataFrame(results)
 
+    merges_chart = alt.Chart(results_df).mark_bar().encode(
+        x=alt.X('Toleranz in Tagen'),
+        y=alt.Y('Anzahl an Merges:Q', scale=alt.Scale(domainMax=len(df_assistance_filtered))),
+        tooltip=['Toleranz in Tagen', 'Anzahl an Merges']
+    )
 
+    merges_chart.save('output/num_merges.html')
 
+    merged_on_towing_df = pd.merge_asof(df_assistance_filtered, df_workshop_filtered, left_on='Incident Date Datum',
+                                        right_on='Reparaturbeginndatum', by='VIN', direction='forward',
+                                        tolerance=pd.Timedelta(days=7))
 
+    # There exist entries in the workshop file where it can be assumed that the workshop entry and calls are correlated
+    # because of a minimal difference. Here we defined it as three days after an analysis:
+    # Example: Many entries in the assistance file where Component, Outcome Description, or Reason of Call are NA (empty)
+    # but there is a workshop entry which can be assumed to be correlated
+    # Entferne Einträge mit 'Towing' oder 'Scheduled Towing' in der Outcome Description
+    df_assistance_no_towing = df_assistance[
+        ~df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])].copy()
 
+    # Erstelle eine neue Spalte mit normalisiertem Datum
+    df_assistance_no_towing['Incident Date Datum'] = df_assistance_no_towing['Incident Date'].dt.normalize()
 
-# Does not always work (ex. VIN 648245833f7a24a77)
-merged_df_1 = merged_df
-['Case Number', 'VIN', 'Incident Date Datum', 'Reparaturbeginndatum', 'Fall_ID', 'Aufenthalt_ID', 'Q-Line',
- 'Werkstattaufenthalt', 'Händler Q-Line'].copy()
+    # Liste der Fall_IDs, die bereits in df_assistance_filtered enthalten sind
+    fall_id_with_towing = df_assistance_filtered['Fall_ID'].unique().tolist()
 
-merged_df = merge_with_tolerance(df_assistance_filtered, df_workshop, 'VIN', 'Incident Date',
-                                     'Reperaturbeginndatum', 7)
+    # Entferne Einträge mit Fall_IDs, die in df_assistance_filtered vorhanden sind
+    df_assistance_no_towing_call_before_towing = df_assistance_no_towing[
+        df_assistance_no_towing['Fall_ID'].isin(fall_id_with_towing)]
+    df_assistance_no_towing = df_assistance_no_towing[~df_assistance_no_towing['Fall_ID'].isin(fall_id_with_towing)]
 
+    # Sortiere und behalte nur den letzten Eintrag für jede Fall_ID
+    df_assistance_no_towing = df_assistance_no_towing.sort_values(by=['Incident Date', 'VIN'])
+    df_assistance_no_towing_only_last_call = df_assistance_no_towing.drop_duplicates(subset='Fall_ID', keep='last')
 
-    # ToDo: Merge df_assistance und df_workshop
-    # Kann man es eingrenzen nur auf Einträge in df_assistance wo Outcome Description Towing or Scheduled Towing ist
-    # und in df_workshop Liegenbleiber_Flag == 1? Damit dann eine Fall_ID == Aufenthalt_ID Beziehung aufbauen um alle
-    # Einträge in den gegenseitigen Tabellen mergen
+    # Die restlichen Einträge in ein separates DataFrame speichern
+    tmp_df_assistance_no_towing = df_assistance_no_towing[
+        ~df_assistance_no_towing.index.isin(df_assistance_no_towing_only_last_call.index)]
 
-    # filtered_df.convert_dtypes()
-    # filtered_df.to_csv('data/interim/filtered.csv', index=False)
+    # Zurücksetzen des Index für saubere Verarbeitung später
+    df_assistance_no_towing = df_assistance_no_towing_only_last_call.sort_values(
+        by=['Incident Date Datum', 'VIN']).reset_index(drop=True)
 
-    # Merging Assistance Workshop
+    results_not_on_towing = []
+    for tolerance in range(0, 10):
+        tmp_merges_not_on_towing = pd.merge_asof(df_assistance_no_towing, df_workshop_filtered,
+                                                 left_on='Incident Date Datum',
+                                                 right_on='Reparaturbeginndatum', by='VIN', direction='forward',
+                                                 tolerance=pd.Timedelta(days=tolerance))
+        num_merges = len(tmp_merges_not_on_towing[~tmp_merges_not_on_towing['Aufenthalt_ID'].isna()])
 
-    # Mergen der DataFrames basierend auf VIN und FIN
-    # merged_df = pd.merge(df_assistance, df_workshop, left_on='VIN', right_on='FIN',
-    #                      suffixes=('_df_assistance', '_df_workshop'))
-    #
-    # # Anwenden der Toleranzbedingungen
-    # tolerance_days = 14  # 2 Wochen
-    # tolerance_km = 100
-    #
-    # matched_df = merged_df[
-    #     (abs(merged_df['Incident Date'] - merged_df['Reparaturbeginndatum']) <= timedelta(days=tolerance_days)) &
-    #     (abs(merged_df['Odometer'] - merged_df['Kilometerstand Reparatur']) <= tolerance_km)
-    #     ]
-    #
-    # matched_df.convert_dtypes()
-    # matched_df.to_csv('data/interim/matched.csv', index=False)
+        results_not_on_towing.append({'Toleranz in Tagen': tolerance, 'Anzahl an Merges': num_merges})
 
+    results_not_on_towing_df = pd.DataFrame(results_not_on_towing)
 
+    merges_not_on_towing_chart = alt.Chart(results_not_on_towing_df).mark_bar().encode(
+        x=alt.X('Toleranz in Tagen'),
+        y=alt.Y('Anzahl an Merges'),
+        tooltip=['Toleranz in Tagen', 'Anzahl an Merges']
+    )
 
+    merges_not_on_towing_chart.save('output/num_merges_not_on_towing.html')
 
-logger.info('Matched files ... Done')
+    merged_not_on_towing_df = pd.merge_asof(df_assistance_no_towing, df_workshop_filtered,
+                                            left_on='Incident Date Datum',
+                                            right_on='Reparaturbeginndatum', by='VIN', direction='forward',
+                                            tolerance=pd.Timedelta(days=3))
 
+    merged_df = pd.concat([merged_on_towing_df, df_assistance_no_towing_call_before_towing, merged_not_on_towing_df,
+                           tmp_df_assistance_no_towing], ignore_index=True)
+
+    fall_id_to_aufenthalt_id = merged_df[['Fall_ID', 'Aufenthalt_ID']].copy()
+    fall_id_to_aufenthalt_id = fall_id_to_aufenthalt_id.dropna()
+
+    merged_df.convert_dtypes()
+    merged_df.to_csv('data/interim/merged.csv', index=False)
+    fall_id_to_aufenthalt_id.to_vsc('data/interim/fall_id_to_aufenthalt_id.csv', index=False)
+
+    logger.info('Matched files ... Done')
 
     # ToDo
     # Überpürfen ob Reparaturdaten bei Werkstattaufenthalten identisch sind (Marcs Idee)

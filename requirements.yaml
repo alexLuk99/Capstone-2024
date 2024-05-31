@@ -1,4 +1,4 @@
-name: capstone3.12
+ name: capstone3.12
 channels:
   - conda-forge
   - defaults

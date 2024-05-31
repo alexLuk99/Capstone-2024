@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 import re
+import numpy as np
 from loguru import logger
 from pathlib import Path
 import numpy as np
@@ -211,6 +214,38 @@ def read_prepare_data() -> pd.DataFrame:
 
     # Entfernen temporärer Spalten
     df_assistance = df_assistance.drop(columns=['Time_Diff', 'New_Fall', 'Fall_Number'])
+
+    # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung der Top x-Prozent, mit boolenschen Wert
+
+    # Obere Prozentzahl
+    x = 10
+
+    # Zählen der Häufigkeit jedes eindeutigen Wertes in der Spalte "VIN"
+    vin_counts = df_assistance['VIN'].value_counts()
+
+    # Identifizieren der Schwelle für die obersten x%
+    threshold = vin_counts.quantile((100 - x) / 100)
+
+    # Erstellen einer Liste der VINs, die in die obersten x% fallen
+    top_percent_vins = vin_counts[vin_counts >= threshold].index
+
+    # Erstellen der neuen Spalte "SuS_Anruferzahl" mit dem booleschen Wert "yes" für die obersten x%
+    df_assistance['SuS_Anruferzahl'] = df_assistance['VIN'].apply(
+        lambda vin: 'yes' if vin in top_percent_vins else 'no')
+
+    # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung ob Incident Date an den Rändern des Policy Start und End Dates liegt, mit boolenschen Wert
+
+    # Definieren der Bedingungen
+    condition_start_date = (df_assistance['Incident Date'] >= df_assistance['Policy Start Date']) & \
+                           (df_assistance['Incident Date'] <= df_assistance['Policy Start Date'] + pd.Timedelta(
+                               days=21))
+
+    condition_end_date = (df_assistance['Incident Date'] >= df_assistance['Policy End Date'] - pd.Timedelta(days=21)) & \
+                         (df_assistance['Incident Date'] <= df_assistance['Policy End Date'] + pd.Timedelta(days=21))
+
+    # Erstellen der neuen Spalte "SuS_Vertragszeitraum"
+    df_assistance['SuS_Vertragszeitraum'] = (condition_start_date | condition_end_date).map({True: 'yes', False: 'no'})
+
 
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path = Path('data/interim')

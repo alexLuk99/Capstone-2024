@@ -367,6 +367,33 @@ def read_prepare_data() -> pd.DataFrame:
     chart_stand.save(output_path / 'susometer_stand.html')
     box.save(output_path / 'susometer_box.html')
 
+    #%%
+
+    # Berechnung der statistischen Werte und Quantile
+    stats_df = df_assistance['SuS-O-Meter'].describe(percentiles=[0.25, 0.5, 0.75, 0.9, 0.95, 0.99])
+
+    # Ausgabe der statistischen Werte
+    print(stats_df)
+
+    # Speicherung der statistischen Werte in eine Datei
+    stats_df.to_csv(output_path / 'susometer_stats.csv')
+
+#%%
+
+    # Berechnung des obersten Quantils (z.B. 0.x Quantil)
+    upper_quantile = df_assistance['SuS-O-Meter'].quantile(0.90)
+
+    # Hinzufügen der neuen Spalte
+    df_assistance['Suspect'] = df_assistance['SuS-O-Meter'] >= upper_quantile
+
+    suspect_counts = df_assistance['Suspect'].value_counts()
+
+    # Ausgabe der Häufigkeit
+    print(suspect_counts)
+
+    #%%
+
+
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)
 

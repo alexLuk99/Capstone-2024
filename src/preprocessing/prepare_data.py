@@ -268,6 +268,16 @@ def read_prepare_data() -> pd.DataFrame:
 
     df_assistance = df_assistance.merge(tmp_assistance_grouped[['VIN', 'SuS_Services_Offered']], on='VIN', how='left')
 
+    #Welche VIN bekommt besonders oft einen Ersatzwagen
+    rental_counts = df_assistance[df_assistance['Rental Car Days'] > 0].groupby('VIN').size()
+
+    # Schwellenwert für die oberen 30 % bestimmen
+    threshold = rental_counts.quantile(0.7)
+
+    # Boolean-Spalte erstellen, die angibt, ob eine VIN zu den oberen 30 % gehört
+    df_assistance['SUS_Top 30% Rental Car'] = df_assistance['VIN'].apply(lambda x: rental_counts.get(x, 0) > threshold)
+
+
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)
 

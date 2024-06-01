@@ -364,8 +364,6 @@ def read_prepare_data() -> pd.DataFrame:
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)
 
-    df_assistance = df_assistance.convert_dtypes()
-    df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
 
     logger.info('Prepare assistance report ... done')
     logger.info('Prepare workshop file ...')
@@ -529,10 +527,8 @@ def read_prepare_data() -> pd.DataFrame:
     # Aktualisieren der 'Merged'-Spalte basierend auf der Existenz in merge_df
     df_assistance['Merged'] = df_assistance['Fall_ID'].isin(merged_ids)
 
-
-
-
-
+    df_assistance = df_assistance.convert_dtypes()
+    df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
 
     merged_df.convert_dtypes()
     merged_df.to_csv(interim_path / 'merged.csv', index=False)

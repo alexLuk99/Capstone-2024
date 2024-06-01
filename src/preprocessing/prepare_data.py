@@ -318,6 +318,7 @@ def read_prepare_data() -> pd.DataFrame:
     df_assistance['is_towing'] = df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])
 
     # Berechne die Differenz in Tagen zwischen aufeinanderfolgenden Towing-Events pro VIN
+    df_assistance = df_assistance.sort_values(by=['Incident Date', 'VIN'])
     df_assistance['days_since_last_towing'] = df_assistance.groupby('VIN')['Incident Date'].diff().dt.days
 
     # Markiere die Einträge als True, wenn die Differenz 14 Tage oder weniger beträgt
@@ -327,7 +328,7 @@ def read_prepare_data() -> pd.DataFrame:
     df_assistance['SuS_Breakdown'] = df_assistance['SuS_Breakdown'].fillna(False)
 
     # Entferne die Hilfsspalten
-    df_assistance.drop(columns=['is_towing', 'days_since_last_towing'], inplace=True)
+    df_assistance.drop(columns=['is_towing'], inplace=True)
 
     # Füge die neue Spalte SuS_Abschleppungen hinzu
     df_assistance['SuS_Abschleppungen'] = df_assistance['VIN'].apply(lambda vin: vin in top_vins_towing)
@@ -366,22 +367,6 @@ def read_prepare_data() -> pd.DataFrame:
     chart_stand.save(output_path / 'susometer_stand.html')
     box.save(output_path / 'susometer_box.html')
 
-
-    new_columns = [
-        'SuS_Anruferzahl',
-        'SuS_Vertragszeitraum',
-        'SuS_Services_Offered',
-        'SuS_AnrufeInFall',
-        'SUS_Top 30% Rental Car',
-        'SuS_Breakdown'
-    ]
-
-    # Erstellen eines DataFrames mit der Verteilung der Werte für jede der neuen Spalten
-    value_counts = {col: df_assistance[col].value_counts() for col in new_columns}
-    value_counts_df = pd.DataFrame(value_counts).fillna(0).astype(int)
-
-#%%
-
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)
 
@@ -393,8 +378,6 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop = pd.read_excel(open(input_path / 'Q-Lines_anonymized.xlsx', 'rb'))
     df_workshop = df_workshop.convert_dtypes()
     df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%Y%m%d')
-
-
 
     # Drop duplicated Q-Line entries (623) -> in Q&A4 abgenommen
     df_workshop = df_workshop.drop_duplicates(subset=['Q-Line'])
@@ -539,8 +522,7 @@ def read_prepare_data() -> pd.DataFrame:
     fall_id_to_aufenthalt_id = merged_df[['Fall_ID', 'Aufenthalt_ID']].copy()
     fall_id_to_aufenthalt_id = fall_id_to_aufenthalt_id.dropna()
 
-
-    #Implementierung neuer Spalte in Assistance_df für Kontrolle ob in merged_df, mit boolescher Wert
+    # Implementierung neuer Spalte in Assistance_df für Kontrolle ob in merged_df, mit boolescher Wert
     # Neue Spalte 'Merged' hinzufügen und initialisieren
     df_assistance['Merged'] = False
 
@@ -560,9 +542,9 @@ def read_prepare_data() -> pd.DataFrame:
     logger.info('Matched files ... Done')
 
     # Laden der vorbereiteten Daten
-    #df_assistance_filtered = pd.read_csv('data/interim/assistance.csv')
-    #df_workshop = pd.read_csv('data/interim/workshop.csv')
-    #fall_id_to_aufenthalt_id = pd.read_csv('data/interim/fall_id_to_aufenthalt_id.csv')
+    # df_assistance_filtered = pd.read_csv('data/interim/assistance.csv')
+    # df_workshop = pd.read_csv('data/interim/workshop.csv')
+    # fall_id_to_aufenthalt_id = pd.read_csv('data/interim/fall_id_to_aufenthalt_id.csv')
 
     # Filter für "Towing" oder "Scheduled Towing" in der Assistance-Datei
     df_assistance_filtered_towing = df_assistance_filtered[

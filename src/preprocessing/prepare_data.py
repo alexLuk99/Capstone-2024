@@ -1,13 +1,11 @@
-from datetime import timedelta
-
 import re
 import numpy as np
 from loguru import logger
-from pathlib import Path
-import numpy as np
 
 import pandas as pd
 import altair as alt
+
+from config.paths import input_path, interim_path, output_path
 
 
 def format_time(time_str):
@@ -19,15 +17,6 @@ def format_time(time_str):
     return pd.NA
 
 
-# Function to generate Fall_ID which is a unique identifier for multiple calls from the same VIN in a span of 5 working
-# days (+1 day buffer in case weekend or bank holidays)
-def generate_fall_id(group):
-    group = group.sort_values('Incident Date')
-    group['Fall_Number'] = (group['Incident Date'].diff().dt.days > 6).cumsum() + 1
-    group['Fall_ID'] = group['VIN'] + '_' + group['Fall_Number'].astype(str)
-    return group
-
-
 def read_prepare_data() -> pd.DataFrame:
     # Read and prepare assistance file
     # column Monat and License Plate are missing in sheet 2023
@@ -37,7 +26,8 @@ def read_prepare_data() -> pd.DataFrame:
     sheets = ['2021', '2022', '2023']
     assistance_list = []
     for sheet in sheets:
-        tmp = pd.read_excel(open('data/raw/Assistance_Report_Europa_2021-2023_anonymized.xlsx', 'rb'), sheet_name=sheet)
+        tmp = pd.read_excel(open(input_path / 'Assistance_Report_Europa_2021-2023_anonymized.xlsx', 'rb'),
+                            sheet_name=sheet)
         if 'Product  Type' in tmp.columns:
             tmp = tmp.rename(columns={'Product  Type': 'Report Type'})
         if 'a' in tmp.columns:
@@ -245,8 +235,40 @@ def read_prepare_data() -> pd.DataFrame:
     # Erstellen der neuen Spalte "SuS_Vertragszeitraum"
     df_assistance['SuS_Vertragszeitraum'] = (condition_start_date | condition_end_date)
 
+    offered_services_cols = ['Rental Car', 'Hotel Service', 'Alternative Transport', 'Taxi Service', 'Vehicle Transport',
+                            'Car Key Service', 'Parts Service', 'Additional Services Not Covered']
+
+    for col in offered_services_cols:
+        df_assistance[col] = df_assistance[col].fillna('NO')
+        df_assistance[col] = df_assistance[col].str.upper().astype(str)
+        df_assistance[col] = df_assistance[col].map({'YES': True, 'NO': False}).astype(bool)
+        df_assistance[col] = df_assistance[col].apply(lambda x: x if isinstance(x, bool) else False)
+
+    cols_to_keep = offered_services_cols.copy()
+    cols_to_keep.append('VIN')
+    tmp_assistance = df_assistance[cols_to_keep].copy()
+
+    tmp_assistance_grouped = tmp_assistance.groupby(by='VIN', as_index=False).agg(
+        Rental_Car=pd.NamedAgg(column='Rental Car', aggfunc='sum'),
+        Hotel_Service=pd.NamedAgg(column='Hotel Service', aggfunc='sum'),
+        Alternative_Transport=pd.NamedAgg(column='Alternative Transport', aggfunc='sum'),
+        Taxi_Service=pd.NamedAgg(column='Taxi Service', aggfunc='sum'),
+        Vehicle_Transport=pd.NamedAgg(column='Vehicle Transport', aggfunc='sum'),
+        Car_Key_Service=pd.NamedAgg(column='Car Key Service', aggfunc='sum'),
+        Parts_Service=pd.NamedAgg(column='Parts Service', aggfunc='sum'),
+        Additional_Services_Not_Covered=pd.NamedAgg(column='Additional Services Not Covered', aggfunc='sum')
+    )
+
+    cols = ['Rental_Car', 'Hotel_Service', 'Alternative_Transport', 'Taxi_Service', 'Vehicle_Transport',
+                            'Car_Key_Service', 'Parts_Service', 'Additional_Services_Not_Covered']
+
+    tmp_assistance_grouped['Total Services Offered'] = tmp_assistance_grouped[cols].sum(axis=1)
+    top_percent_services_offered = tmp_assistance_grouped['Total Services Offered'].quantile(0.9)
+    tmp_assistance_grouped['SuS_Services_Offered'] = tmp_assistance_grouped['Total Services Offered'] >= top_percent_services_offered
+
+    df_assistance = df_assistance.merge(tmp_assistance_grouped[['VIN', 'SuS_Services_Offered']], on='VIN', how='left')
+
     # Erstellen des Zwischenpfads und Speichern der Datei
-    interim_path = Path('data/interim')
     interim_path.mkdir(parents=True, exist_ok=True)
 
     df_assistance = df_assistance.convert_dtypes()
@@ -256,7 +278,7 @@ def read_prepare_data() -> pd.DataFrame:
     logger.info('Prepare workshop file ...')
 
     # Read and prepare workshop file
-    df_workshop = pd.read_excel(open('data/raw/Q-Lines_anonymized.xlsx', 'rb'))
+    df_workshop = pd.read_excel(open(input_path / 'Q-Lines_anonymized.xlsx', 'rb'))
     df_workshop = df_workshop.convert_dtypes()
     df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%Y%m%d')
 
@@ -335,7 +357,7 @@ def read_prepare_data() -> pd.DataFrame:
         tooltip=['Toleranz in Tagen', 'Anzahl an Merges']
     )
 
-    merges_chart.save('output/num_merges.html')
+    merges_chart.save(output_path / 'num_merges.html')
 
     merged_on_towing_df = pd.merge_asof(df_assistance_filtered, df_workshop_filtered, left_on='Incident Date Datum',
                                         right_on='Reparaturbeginndatum', by='VIN', direction='forward',
@@ -390,7 +412,7 @@ def read_prepare_data() -> pd.DataFrame:
         tooltip=['Toleranz in Tagen', 'Anzahl an Merges']
     )
 
-    merges_not_on_towing_chart.save('output/num_merges_not_on_towing.html')
+    merges_not_on_towing_chart.save(output_path / 'num_merges_not_on_towing.html')
 
     merged_not_on_towing_df = pd.merge_asof(df_assistance_no_towing, df_workshop_filtered,
                                             left_on='Incident Date Datum',
@@ -404,8 +426,8 @@ def read_prepare_data() -> pd.DataFrame:
     fall_id_to_aufenthalt_id = fall_id_to_aufenthalt_id.dropna()
 
     merged_df.convert_dtypes()
-    merged_df.to_csv('data/interim/merged.csv', index=False)
-    fall_id_to_aufenthalt_id.to_vsc('data/interim/fall_id_to_aufenthalt_id.csv', index=False)
+    merged_df.to_csv(interim_path / 'merged.csv', index=False)
+    fall_id_to_aufenthalt_id.to_csv(interim_path / 'fall_id_to_aufenthalt_id.csv', index=False)
 
     logger.info('Matched files ... Done')
 

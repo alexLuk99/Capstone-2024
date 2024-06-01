@@ -522,21 +522,24 @@ def read_prepare_data() -> pd.DataFrame:
     fall_id_to_aufenthalt_id = merged_df[['Fall_ID', 'Aufenthalt_ID']].copy()
     fall_id_to_aufenthalt_id = fall_id_to_aufenthalt_id.dropna()
 
-    # Implementierung neuer Spalte in Assistance_df für Kontrolle ob in merged_df, mit boolescher Wert
+    merged_df.to_csv(interim_path / 'merged.csv', index=False)
+
+
+    # Implementierung neuer Spalte in df_assistance für Kontrolle ob in merged_df, mit booleschem Wert
     # Neue Spalte 'Merged' hinzufügen und initialisieren
     df_assistance['Merged'] = False
 
-    # Fall_IDs aus merge_df
-    merged_ids = merged_df['Fall_ID']
+    # Fall_IDs aus merged_df
+    merged_df = merged_df[merged_df['Q-Line'].isna()]
+    merged_ids = merged_df['Case Number']
 
-    # Aktualisieren der 'Merged'-Spalte basierend auf der Existenz in merge_df
-    df_assistance['Merged'] = df_assistance['Fall_ID'].isin(merged_ids)
+    # Aktualisieren der 'Merged'-Spalte basierend auf der Existenz in merged_df
+    df_assistance['Merged'] = df_assistance['Case Number'].isin(merged_ids)
 
     df_assistance = df_assistance.convert_dtypes()
     df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
 
     merged_df.convert_dtypes()
-    merged_df.to_csv(interim_path / 'merged.csv', index=False)
     fall_id_to_aufenthalt_id.to_csv(interim_path / 'fall_id_to_aufenthalt_id.csv', index=False)
 
     logger.info('Matched files ... Done')

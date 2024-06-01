@@ -5,25 +5,20 @@ from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.preprocessing import LabelEncoder
 from sklearn.impute import SimpleImputer
 
+
 def classification(df_assistance: pd.DataFrame) -> None:
     # 'VIN' als Index setzen
     df_assistance.set_index('VIN', inplace=True)
 
     # Features und Labels trennen
     X = df_assistance[
-        ['Incident Date', 'Registration Date', 'Policy Start Date', 'Policy End Date',
-         'Country Of Incident', 'Handling Call Center', 'Baureihe', 'Component', 'Outcome Description',
+        ['Country Of Incident', 'Handling Call Center', 'Baureihe', 'Component', 'Outcome Description',
          'RSA Successful']]
     y = df_assistance['Merged']
 
-    # Datumsangaben in numerische Werte umwandeln
-    date_columns = ['Incident Date', 'Registration Date', 'Policy Start Date', 'Policy End Date']
-    for col in date_columns:
-        X.loc[:, col] = pd.to_datetime(X[col], errors='coerce')
-        X.loc[:, col] = X[col].map(pd.Timestamp.toordinal)
-
     # Kategorische Daten mit LabelEncoder kodieren
-    categorical_columns = ['Country Of Incident', 'Handling Call Center', 'Baureihe', 'Component', 'Outcome Description', 'RSA Successful']
+    categorical_columns = ['Country Of Incident', 'Handling Call Center', 'Baureihe', 'Component',
+                           'Outcome Description', 'RSA Successful']
     label_encoders = {}
     for col in categorical_columns:
         le = LabelEncoder()
@@ -36,7 +31,6 @@ def classification(df_assistance: pd.DataFrame) -> None:
             try:
                 X[col] = X[col].astype(float)
             except ValueError:
-                # Falls es immer noch nicht numerisch ist, gibt es unerwartete nicht-numerische Werte
                 print(f"Spalte {col} enthält nicht-numerische Werte, die nicht umgewandelt werden konnten.")
                 print(X[col].unique())
                 return
@@ -65,6 +59,11 @@ def classification(df_assistance: pd.DataFrame) -> None:
     importances = pd.Series(feature_importances, index=features)
     print(importances)
 
+
 # Beispielaufruf
-# df_assistance = pd.read_csv('path_to_your_data.csv')  # Laden Sie Ihre Daten
-# classification(df_assistance)
+if __name__ == "__main__":
+    # Lade den DataFrame (ersetze den Pfad durch deinen tatsächlichen Pfad)
+    df_assistance = pd.read_csv('data/interim/assistance.csv', low_memory=False)
+
+    # Aufruf der Klassifikationsfunktion
+    classification(df_assistance)

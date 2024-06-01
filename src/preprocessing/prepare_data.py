@@ -52,8 +52,6 @@ def read_prepare_data() -> pd.DataFrame:
     # Drop duplicates over whole dataset (however, there are duplicate case numbers)
     df_assistance = df_assistance.drop_duplicates()
 
-
-
     # Convert Incident Date and Time of Arrival to DateTime and add time from Time of Call or Time of Arrival
     df_assistance['Incident Date'] = pd.to_datetime(df_assistance['Incident Date'], format='%d/%m/%Y')
     df_assistance['Time Of Arrival'] = df_assistance['Time Of Arrival'].replace({'0': pd.NA})
@@ -117,6 +115,11 @@ def read_prepare_data() -> pd.DataFrame:
     # Q&A 3 -> max plausible Odometer is 260_000
     df_assistance.loc[df_assistance['Odometer'] < 50, 'Odometer'] = np.nan
     df_assistance.loc[df_assistance['Odometer'] > 260_000, 'Odometer'] = np.nan
+
+    #Binning of Odometer
+    bins = np.arange(0, 260000, 20000)
+    labels = [f'{int(b)}-{int(b + 20000)}' for b in bins[:-1]]
+    df_assistance['Odometer_Binned'] = pd.cut(df_assistance['Odometer'], bins=bins, labels=labels, right=True)
 
     # Mapping vehicle model & Merge
     mapping_vehicle_model = pd.read_excel('utils/mapping/vehicle_model.xlsx')

@@ -26,7 +26,7 @@ def classification(df_assistance: pd.DataFrame) -> None:
 
     categorical_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='most_frequent')),
-        ('le', LabelEncoder())
+        ('onehot', OneHotEncoder(handle_unknown='ignore'))
     ])
 
     # ColumnTransformer zur Anwendung der jeweiligen Transformer auf die entsprechenden Spalten

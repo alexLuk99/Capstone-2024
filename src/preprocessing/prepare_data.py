@@ -293,13 +293,13 @@ def read_prepare_data() -> pd.DataFrame:
     quant = 0.75
 
     # Berechnen der Anzahl der Vorkommen jeder 'Fall_ID'
-    fall_id_counts = df_assistance['Fall_ID'].value_counts()
-
+    fall_id_counts = df_assistance.groupby('VIN')['Fall_ID'].nunique()
     # Berechnen des Schwellenwertes für die obersten 25%
+
     threshold = fall_id_counts.quantile(quant)
 
     # Erstellen der neuen Spalte 'SuS_AnrufeInFall'
-    df_assistance['SuS_AnrufeInFall'] = df_assistance['Fall_ID'].map(fall_id_counts) > threshold
+    df_assistance['SuS_AnrufeInFall'] = df_assistance['VIN'].map(fall_id_counts) > threshold
 
     # Welche VIN bekommt besonders oft einen Ersatzwagen
     rental_counts = df_assistance[df_assistance['Rental Car Days'] > 0].groupby('VIN').size()
@@ -307,7 +307,7 @@ def read_prepare_data() -> pd.DataFrame:
     # Schwellenwert für die oberen 25 % bestimmen
     threshold = rental_counts.quantile(quant)
 
-    # Boolean-Spalte erstellen, die angibt, ob eine VIN zu den oberen 30 % gehört
+    # Boolean-Spalte erstellen, die angibt, ob eine VIN zu den oberen x % gehört
     df_assistance['SuS_Rental_Car'] = df_assistance['VIN'].apply(lambda x: rental_counts.get(x, 0) > threshold)
 
     # Berechne die Top 25% der VINs nach Anzahl der Abschleppvorgänge

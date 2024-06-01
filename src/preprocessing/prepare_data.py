@@ -261,6 +261,14 @@ def read_prepare_data() -> pd.DataFrame:
     # Erstellen der neuen Spalte 'SuS_AnrufeInFall'
     df_assistance['SuS_AnrufeInFall'] = df_assistance['Fall_ID'].map(fall_id_counts) > threshold
 
+    #Welche VIN bekommt besonders oft einen Ersatzwagen
+    rental_counts = df_assistance[df_assistance['Rental Car Days'] > 0].groupby('VIN').size()
+
+    # Schwellenwert für die oberen 30 % bestimmen
+    threshold = rental_counts.quantile(0.7)
+
+    # Boolean-Spalte erstellen, die angibt, ob eine VIN zu den oberen 30 % gehört
+    df_assistance['SUS_Top 30% Rental Car'] = df_assistance['VIN'].apply(lambda x: rental_counts.get(x, 0) > threshold)
 
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path = Path('data/interim')

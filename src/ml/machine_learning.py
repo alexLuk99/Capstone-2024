@@ -12,7 +12,7 @@ def machine_learning() -> None:
     # classification with leads
 
     # clustering
-    #clustering(df_assistance=df_assistance, df_workshop=df_workshop, df_merged=df_merged)
+    # clustering(df_assistance=df_assistance)
 
     # categorisation
     classification(df_assistance=df_assistance)

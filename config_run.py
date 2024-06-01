@@ -1,5 +1,5 @@
 runners = [
-     'data_preparation',
-     #'analysis',
-    #'machine_learning',
+    # 'data_preparation',
+    # 'analysis',
+    'machine_learning',
 ]

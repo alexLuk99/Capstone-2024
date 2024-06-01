@@ -1,9 +1,13 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.preprocessing import LabelEncoder
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, FunctionTransformer
 from sklearn.impute import SimpleImputer
+import xgboost as xgb
+from sklearn.linear_model import LogisticRegression
 
 
 def classification(df_assistance: pd.DataFrame) -> None:
@@ -19,51 +23,59 @@ def classification(df_assistance: pd.DataFrame) -> None:
     # Kategorische Daten mit LabelEncoder kodieren
     categorical_columns = ['Country Of Incident', 'Handling Call Center', 'Baureihe', 'Component',
                            'Outcome Description', 'RSA Successful']
-    label_encoders = {}
-    for col in categorical_columns:
-        le = LabelEncoder()
-        X[col] = le.fit_transform(X[col].astype(str))
-        label_encoders[col] = le
 
-    # Sicherstellen, dass alle Daten numerisch sind
-    for col in X.columns:
-        if X[col].dtype == 'object':
-            try:
-                X[col] = X[col].astype(float)
-            except ValueError:
-                print(f"Spalte {col} enthält nicht-numerische Werte, die nicht umgewandelt werden konnten.")
-                print(X[col].unique())
-                return
+    categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='most_frequent')),
+        ('le', LabelEncoder())
+    ])
 
-    # Fehlende Werte imputieren (falls vorhanden)
-    imputer = SimpleImputer(strategy='mean')
-    X = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
+    # ColumnTransformer zur Anwendung der jeweiligen Transformer auf die entsprechenden Spalten
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('cat', categorical_transformer, categorical_columns)
+        ])
+
+    # Pipeline für den gesamten Prozess
+    clf = Pipeline(steps=[
+        ('preprocessor', preprocessor),
+        ('classifier', xgb.XGBClassifier(random_state=42))
+    ])
+
+    # Hyperparameter-Raster
+    param_grid = {
+        'classifier__n_estimators': [50, 100, 150],
+        'classifier__learning_rate': [0.01, 0.1, 0.2],
+        'classifier__max_depth': [3, 5, 7],
+        'classifier__subsample': [0.6, 0.8, 1.0],
+        'classifier__colsample_bytree': [0.6, 0.8, 1.0]
+    }
+
+    # GridSearchCV Initialisieren
+    grid_search = GridSearchCV(clf, param_grid, cv=5, scoring='accuracy', n_jobs=-1)
 
     # Aufteilen in Trainings- und Testdatensätze
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-    # Modell initialisieren und trainieren
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
+    # Hyperparameter-Tuning und Modell-Training
+    grid_search.fit(X_train, y_train)
+
+    # Beste Parameter und bestes Modell
+    best_params = grid_search.best_params_
+    best_model = grid_search.best_estimator_
+
+    print(f"Beste Parameter: {best_params}")
 
     # Vorhersagen treffen
-    y_pred = model.predict(X_test)
+    y_pred = best_model.predict(X_test)
 
     # Modellbewertung
     print(confusion_matrix(y_test, y_pred))
     print(classification_report(y_test, y_pred))
 
     # Feature-Wichtigkeit anzeigen
+    model = best_model.named_steps['classifier']
     feature_importances = model.feature_importances_
-    features = X.columns
-    importances = pd.Series(feature_importances, index=features)
-    print(importances)
-
-
-# Beispielaufruf
-if __name__ == "__main__":
-    # Lade den DataFrame (ersetze den Pfad durch deinen tatsächlichen Pfad)
-    df_assistance = pd.read_csv('data/interim/assistance.csv', low_memory=False)
-
-    # Aufruf der Klassifikationsfunktion
-    classification(df_assistance)
+    feature_names = best_model.named_steps['preprocessor'].transformers_[0][1]['onehot'].get_feature_names_out(
+        categorical_columns)
+    importances = pd.Series(feature_importances, index=feature_names)
+    print(importances.sort_values(ascending=False))

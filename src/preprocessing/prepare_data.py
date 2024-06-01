@@ -80,7 +80,7 @@ def read_prepare_data() -> pd.DataFrame:
         registration_date_2 = pd.to_datetime(df_assistance[column], errors='coerce', format='%Y%m%d')
         df_assistance[column] = registration_date_1.fillna(registration_date_2)
 
-    #Bereinigung der "Registration Date" Spalte: Ab 1948 bis 2023
+    # Bereinigung der "Registration Date" Spalte: Ab 1948 bis 2023
 
     df_assistance.loc[
         (df_assistance['Registration Date'].dt.year < 1948) | (df_assistance['Registration Date'].dt.year > 2023),
@@ -370,7 +370,6 @@ def read_prepare_data() -> pd.DataFrame:
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)
 
-
     logger.info('Prepare assistance report ... done')
     logger.info('Prepare workshop file ...')
 
@@ -522,15 +521,18 @@ def read_prepare_data() -> pd.DataFrame:
     fall_id_to_aufenthalt_id = merged_df[['Fall_ID', 'Aufenthalt_ID']].copy()
     fall_id_to_aufenthalt_id = fall_id_to_aufenthalt_id.dropna()
 
-    merged_df.to_csv(interim_path / 'merged.csv', index=False)
+    fall_id_to_aufenthalt_id = fall_id_to_aufenthalt_id.convert_dtypes()
+    fall_id_to_aufenthalt_id.to_csv(interim_path / 'fall_id_to_aufenthalt_id.csv', index=False)
 
+    merged_df.convert_dtypes()
+    merged_df.to_csv(interim_path / 'merged.csv', index=False)
 
     # Implementierung neuer Spalte in df_assistance für Kontrolle ob in merged_df, mit booleschem Wert
     # Neue Spalte 'Merged' hinzufügen und initialisieren
     df_assistance['Merged'] = False
 
     # Fall_IDs aus merged_df
-    merged_df = merged_df[merged_df['Q-Line'].isna()]
+    merged_df = merged_df[~merged_df['Q-Line'].isna()]
     merged_ids = merged_df['Case Number']
 
     # Aktualisieren der 'Merged'-Spalte basierend auf der Existenz in merged_df
@@ -538,9 +540,6 @@ def read_prepare_data() -> pd.DataFrame:
 
     df_assistance = df_assistance.convert_dtypes()
     df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
-
-    merged_df.convert_dtypes()
-    fall_id_to_aufenthalt_id.to_csv(interim_path / 'fall_id_to_aufenthalt_id.csv', index=False)
 
     logger.info('Matched files ... Done')
 

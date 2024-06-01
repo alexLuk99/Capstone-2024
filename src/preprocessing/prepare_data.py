@@ -80,6 +80,12 @@ def read_prepare_data() -> pd.DataFrame:
         registration_date_2 = pd.to_datetime(df_assistance[column], errors='coerce', format='%Y%m%d')
         df_assistance[column] = registration_date_1.fillna(registration_date_2)
 
+    #Bereinigung der "Registration Date" Spalte: Ab 1948 bis 2023
+
+    df_assistance.loc[
+        (df_assistance['Registration Date'].dt.year < 1948) | (df_assistance['Registration Date'].dt.year > 2023),
+        'Registration Date'] = pd.NaT
+
     # Add month in month column where value is na
     # Column month does not exist for sheet 2023 (thus some of the missing values)
     df_assistance.loc[df_assistance['Monat'].isna(), 'Monat'] = df_assistance['Incident Date'].dt.month
@@ -361,6 +367,21 @@ def read_prepare_data() -> pd.DataFrame:
     box.save(output_path / 'susometer_box.html')
 
 
+    new_columns = [
+        'SuS_Anruferzahl',
+        'SuS_Vertragszeitraum',
+        'SuS_Services_Offered',
+        'SuS_AnrufeInFall',
+        'SUS_Top 30% Rental Car',
+        'SuS_Breakdown'
+    ]
+
+    # Erstellen eines DataFrames mit der Verteilung der Werte für jede der neuen Spalten
+    value_counts = {col: df_assistance[col].value_counts() for col in new_columns}
+    value_counts_df = pd.DataFrame(value_counts).fillna(0).astype(int)
+
+#%%
+
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)
 
@@ -374,6 +395,8 @@ def read_prepare_data() -> pd.DataFrame:
     df_workshop = pd.read_excel(open(input_path / 'Q-Lines_anonymized.xlsx', 'rb'))
     df_workshop = df_workshop.convert_dtypes()
     df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%Y%m%d')
+
+
 
     # Drop duplicated Q-Line entries (623) -> in Q&A4 abgenommen
     df_workshop = df_workshop.drop_duplicates(subset=['Q-Line'])

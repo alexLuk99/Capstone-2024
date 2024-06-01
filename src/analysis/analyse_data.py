@@ -18,10 +18,57 @@ def analyse_data() -> None:
     df_assistance = pd.read_csv('data/interim/assistance.csv', low_memory=False)
     df_assistance = df_assistance.convert_dtypes()
 
+    # Merged-Tabelle einlesen
+    df_merged = pd.read_csv('data/interim/merged.csv', low_memory=False)
+    df_merged = df_merged.convert_dtypes()
+
     # Create output dir
     output_path = Path('output')
     output_path.mkdir(exist_ok=True, parents=True)
 
+    # Filter nur numerische Spalten für die Berechnung der Korrelationsmatrix
+    numeric_cols = df_merged.select_dtypes(include=['number']).columns
+    df_numeric = df_merged[numeric_cols]
+
+    # Berechnung der Korrelationsmatrix
+    corr_matrix = df_numeric.corr()
+
+    # Umwandlung der Korrelationsmatrix in ein langes Format
+    corr_matrix_long = corr_matrix.reset_index().melt(id_vars='index')
+    corr_matrix_long.columns = ['Variable1', 'Variable2', 'Correlation']
+
+    # Visualisierung der Korrelationsmatrix mit Altair
+    base = alt.Chart(corr_matrix_long).encode(
+        x=alt.X('Variable1:O', title='Variable 1'),
+        y=alt.Y('Variable2:O', title='Variable 2')
+    )
+
+    heatmap = base.mark_rect().encode(
+        color=alt.Color('Correlation:Q', scale=alt.Scale(scheme='viridis')),
+        tooltip=['Variable1', 'Variable2', 'Correlation']
+    )
+
+    text = base.mark_text(baseline='middle').encode(
+        text=alt.Text('Correlation:Q', format='.2f'),
+        color=alt.condition(
+            alt.datum.Correlation > 0.5,  # Helle Farbe für positive Korrelationen
+            alt.value('black'),
+            alt.value('white')
+        )
+    )
+
+    chart = heatmap + text
+
+    chart = chart.properties(
+        title='Correlation Heatmap',
+        width=600,
+        height=600
+    )
+
+    # Speichern der Heatmap
+    heatmap_path = output_path / 'correlation_heatmap.html'
+    chart.save(heatmap_path)
+    print("test")
 
     # Top 10% der VINs mit den meisten Abschleppvorgängen
     towing_df = df_assistance[df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])]

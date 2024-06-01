@@ -218,7 +218,7 @@ def read_prepare_data() -> pd.DataFrame:
     # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung der Top x-Prozent, mit boolenschen Wert
 
     # Obere Prozentzahl
-    x = 10
+    x = 20
 
     # Zählen der Häufigkeit jedes eindeutigen Wertes in der Spalte "VIN"
     vin_counts = df_assistance['VIN'].value_counts()
@@ -235,15 +235,32 @@ def read_prepare_data() -> pd.DataFrame:
 
     # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung ob Incident Date an den Rändern des Policy Start und End Dates liegt, mit boolenschen Wert
     # Definieren der Bedingungen
+
     condition_start_date = (df_assistance['Incident Date'] >= df_assistance['Policy Start Date']) & \
                            (df_assistance['Incident Date'] <= df_assistance['Policy Start Date'] + pd.Timedelta(
-                               days=21))
+                               days=30))
 
-    condition_end_date = (df_assistance['Incident Date'] >= df_assistance['Policy End Date'] - pd.Timedelta(days=21)) & \
-                         (df_assistance['Incident Date'] <= df_assistance['Policy End Date'] + pd.Timedelta(days=21))
+    condition_end_date = (df_assistance['Incident Date'] >= df_assistance['Policy End Date'] - pd.Timedelta(days=30)) | \
+                         (df_assistance['Incident Date'] > df_assistance['Policy End Date'])
 
     # Erstellen der neuen Spalte "SuS_Vertragszeitraum"
     df_assistance['SuS_Vertragszeitraum'] = (condition_start_date | condition_end_date)
+
+
+    # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung der obersten x Prozent, die am meisten Voranrufe in einem Fall haben, mit booleschen Wert
+
+    # Obere Prozentzahl
+    x = 20
+
+    # Berechnen der Anzahl der Vorkommen jeder 'Fall_ID'
+    fall_id_counts = df_assistance['Fall_ID'].value_counts()
+
+    # Berechnen des Schwellenwertes für die obersten x%
+    threshold = fall_id_counts.quantile((100 - x) / 100)
+
+    # Erstellen der neuen Spalte 'SuS_AnrufeInFall'
+    df_assistance['SuS_AnrufeInFall'] = df_assistance['Fall_ID'].map(fall_id_counts) > threshold
+
 
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path = Path('data/interim')
@@ -405,7 +422,7 @@ def read_prepare_data() -> pd.DataFrame:
 
     merged_df.convert_dtypes()
     merged_df.to_csv('data/interim/merged.csv', index=False)
-    fall_id_to_aufenthalt_id.to_vsc('data/interim/fall_id_to_aufenthalt_id.csv', index=False)
+    fall_id_to_aufenthalt_id.to_csv('data/interim/fall_id_to_aufenthalt_id.csv', index=False)
 
     logger.info('Matched files ... Done')
 

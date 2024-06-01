@@ -61,6 +61,8 @@ def read_prepare_data() -> pd.DataFrame:
     # Drop duplicates over whole dataset (however, there are duplicate case numbers)
     df_assistance = df_assistance.drop_duplicates()
 
+
+
     # Convert Incident Date and Time of Arrival to DateTime and add time from Time of Call or Time of Arrival
     df_assistance['Incident Date'] = pd.to_datetime(df_assistance['Incident Date'], format='%d/%m/%Y')
     df_assistance['Time Of Arrival'] = df_assistance['Time Of Arrival'].replace({'0': pd.NA})
@@ -228,6 +230,15 @@ def read_prepare_data() -> pd.DataFrame:
 
     # Erstellen einer Liste der VINs, die in die obersten x% fallen
     top_percent_vins = vin_counts[vin_counts >= threshold].index
+
+    # Berechne die Top 10% der VINs nach Anzahl der Abschleppvorgänge
+    towing_df = df_assistance[df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])]
+    vin_counts = towing_df['VIN'].value_counts()
+    threshold = vin_counts.quantile(0.90)
+    top_10_percent_vins_towing = vin_counts[vin_counts >= threshold].index
+
+    # Füge die neue Spalte SuS_Abschleppungen hinzu
+    df_assistance['SuS_Abschleppungen'] = df_assistance['VIN'].apply(lambda vin: vin in top_10_percent_vins_towing)
 
     # Erstellen der neuen Spalte "SuS_Anruferzahl" mit dem booleschen Wert "yes" für die obersten x%
     df_assistance['SuS_Anruferzahl'] = df_assistance['VIN'].apply(

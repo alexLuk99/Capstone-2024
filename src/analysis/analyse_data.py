@@ -22,6 +22,33 @@ def analyse_data() -> None:
     output_path = Path('output')
     output_path.mkdir(exist_ok=True, parents=True)
 
+
+    # Top 10% der VINs mit den meisten Abschleppvorgängen
+    towing_df = df_assistance[df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])]
+    vin_counts = towing_df['VIN'].value_counts()
+    threshold = vin_counts.quantile(0.90)
+    top_10_percent_vins = vin_counts[vin_counts >= threshold]
+    top_10_percent_vins_df = top_10_percent_vins.reset_index()
+    top_10_percent_vins_df.columns = ['VIN', 'Count']
+
+    # Sortieren nach der Anzahl der Abschleppvorgänge
+    top_10_percent_vins_df = top_10_percent_vins_df.sort_values(by='Count', ascending=False).head(100)
+
+    # Erstellen des Balkendiagramms
+    chart = alt.Chart(top_10_percent_vins_df).mark_bar().encode(
+        x=alt.X('VIN:N', sort='-y', title='VIN'),
+        y=alt.Y('Count:Q', title='Anzahl der Abschleppvorgänge'),
+        tooltip=['VIN:N', 'Count:Q']
+    ).properties(
+        title='Top 10% der VINs mit den meisten Abschleppvorgängen',
+        width=800,
+        height=400
+    )
+
+    # Speichern des Balkendiagramms
+    chart.save(output_path / 'top_10_percent_vins_towing.html')
+    print("test")
+
     # Difference between policy start/end date with first assistance call
     policy_start_end_date(data=df_assistance, output_path=output_path)
 

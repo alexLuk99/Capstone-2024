@@ -82,6 +82,12 @@ def read_prepare_data() -> pd.DataFrame:
         registration_date_2 = pd.to_datetime(df_assistance[column], errors='coerce', format='%Y%m%d')
         df_assistance[column] = registration_date_1.fillna(registration_date_2)
 
+    #Bereinigung der "Registration Date" Spalte: Ab 1948 bis 2023
+
+    df_assistance.loc[
+        (df_assistance['Registration Date'].dt.year < 1948) | (df_assistance['Registration Date'].dt.year > 2023),
+        'Registration Date'] = pd.NaT
+
     # Add month in month column where value is na
     # Column month does not exist for sheet 2023 (thus some of the missing values)
     df_assistance.loc[df_assistance['Monat'].isna(), 'Monat'] = df_assistance['Incident Date'].dt.month
@@ -323,6 +329,7 @@ def read_prepare_data() -> pd.DataFrame:
     df_assistance['is_towing'] = df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])
 
     # Berechne die Differenz in Tagen zwischen aufeinanderfolgenden Towing-Events pro VIN
+    df_assistance = df_assistance.sort_values(by=['Incident Date', 'VIN'])
     df_assistance['days_since_last_towing'] = df_assistance.groupby('VIN')['Incident Date'].diff().dt.days
 
     # Markiere die Einträge als True, wenn die Differenz 14 Tage oder weniger beträgt
@@ -332,7 +339,7 @@ def read_prepare_data() -> pd.DataFrame:
     df_assistance['SuS_Breakdown'] = df_assistance['SuS_Breakdown'].fillna(False)
 
     # Entferne die Hilfsspalten
-    df_assistance.drop(columns=['is_towing', 'days_since_last_towing'], inplace=True)
+    df_assistance.drop(columns=['is_towing'], inplace=True)
 
     # Füge die neue Spalte SuS_Abschleppungen hinzu
     df_assistance['SuS_Abschleppungen'] = df_assistance['VIN'].apply(lambda vin: vin in top_vins_towing)
@@ -371,12 +378,9 @@ def read_prepare_data() -> pd.DataFrame:
     chart_stand.save(output_path / 'susometer_stand.html')
     box.save(output_path / 'susometer_box.html')
 
-
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)
 
-    df_assistance = df_assistance.convert_dtypes()
-    df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
 
     logger.info('Prepare assistance report ... done')
     logger.info('Prepare workshop file ...')
@@ -528,6 +532,19 @@ def read_prepare_data() -> pd.DataFrame:
 
     fall_id_to_aufenthalt_id = merged_df[['Fall_ID', 'Aufenthalt_ID']].copy()
     fall_id_to_aufenthalt_id = fall_id_to_aufenthalt_id.dropna()
+
+    # Implementierung neuer Spalte in Assistance_df für Kontrolle ob in merged_df, mit boolescher Wert
+    # Neue Spalte 'Merged' hinzufügen und initialisieren
+    df_assistance['Merged'] = False
+
+    # Fall_IDs aus merge_df
+    merged_ids = merged_df['Fall_ID']
+
+    # Aktualisieren der 'Merged'-Spalte basierend auf der Existenz in merge_df
+    df_assistance['Merged'] = df_assistance['Fall_ID'].isin(merged_ids)
+
+    df_assistance = df_assistance.convert_dtypes()
+    df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
 
     merged_df.convert_dtypes()
     merged_df.to_csv(interim_path / 'merged.csv', index=False)

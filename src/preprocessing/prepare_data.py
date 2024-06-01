@@ -208,7 +208,7 @@ def read_prepare_data() -> pd.DataFrame:
     # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung der Top x-Prozent, mit boolenschen Wert
 
     # Obere Prozentzahl
-    x = 10
+    x = 20
 
     # Zählen der Häufigkeit jedes eindeutigen Wertes in der Spalte "VIN"
     vin_counts = df_assistance['VIN'].value_counts()
@@ -225,12 +225,13 @@ def read_prepare_data() -> pd.DataFrame:
 
     # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung ob Incident Date an den Rändern des Policy Start und End Dates liegt, mit boolenschen Wert
     # Definieren der Bedingungen
+
     condition_start_date = (df_assistance['Incident Date'] >= df_assistance['Policy Start Date']) & \
                            (df_assistance['Incident Date'] <= df_assistance['Policy Start Date'] + pd.Timedelta(
-                               days=21))
+                               days=30))
 
-    condition_end_date = (df_assistance['Incident Date'] >= df_assistance['Policy End Date'] - pd.Timedelta(days=21)) & \
-                         (df_assistance['Incident Date'] <= df_assistance['Policy End Date'] + pd.Timedelta(days=21))
+    condition_end_date = (df_assistance['Incident Date'] >= df_assistance['Policy End Date'] - pd.Timedelta(days=30)) | \
+                         (df_assistance['Incident Date'] > df_assistance['Policy End Date'])
 
     # Erstellen der neuen Spalte "SuS_Vertragszeitraum"
     df_assistance['SuS_Vertragszeitraum'] = (condition_start_date | condition_end_date)
@@ -268,6 +269,20 @@ def read_prepare_data() -> pd.DataFrame:
 
     df_assistance = df_assistance.merge(tmp_assistance_grouped[['VIN', 'SuS_Services_Offered']], on='VIN', how='left')
 
+    # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung der obersten x Prozent, die am meisten Voranrufe in einem Fall haben, mit booleschen Wert
+
+    # Obere Prozentzahl
+    x = 20
+
+    # Berechnen der Anzahl der Vorkommen jeder 'Fall_ID'
+    fall_id_counts = df_assistance['Fall_ID'].value_counts()
+
+    # Berechnen des Schwellenwertes für die obersten x%
+    threshold = fall_id_counts.quantile((100 - x) / 100)
+
+    # Erstellen der neuen Spalte 'SuS_AnrufeInFall'
+    df_assistance['SuS_AnrufeInFall'] = df_assistance['Fall_ID'].map(fall_id_counts) > threshold
+
     #Welche VIN bekommt besonders oft einen Ersatzwagen
     rental_counts = df_assistance[df_assistance['Rental Car Days'] > 0].groupby('VIN').size()
 
@@ -276,7 +291,6 @@ def read_prepare_data() -> pd.DataFrame:
 
     # Boolean-Spalte erstellen, die angibt, ob eine VIN zu den oberen 30 % gehört
     df_assistance['SUS_Top 30% Rental Car'] = df_assistance['VIN'].apply(lambda x: rental_counts.get(x, 0) > threshold)
-
 
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)

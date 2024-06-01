@@ -236,15 +236,18 @@ def read_prepare_data() -> pd.DataFrame:
     # Erstellen der neuen Spalte "SuS_Vertragszeitraum"
     df_assistance['SuS_Vertragszeitraum'] = (condition_start_date | condition_end_date)
 
-    offered_services_cols = ['Rental Car', 'Hotel Service', 'Alternative Transport', 'Taxi Service', 'Vehicle Transport',
-                            'Car Key Service', 'Parts Service', 'Additional Services Not Covered']
+    # Check for top 10% VINs with most services offered
+    offered_services_cols = ['Rental Car', 'Hotel Service', 'Alternative Transport', 'Taxi Service',
+                             'Vehicle Transport', 'Car Key Service', 'Parts Service', 'Additional Services Not Covered']
 
+    # Reformat cols in original dataframe
     for col in offered_services_cols:
         df_assistance[col] = df_assistance[col].fillna('NO')
         df_assistance[col] = df_assistance[col].str.upper().astype(str)
         df_assistance[col] = df_assistance[col].map({'YES': True, 'NO': False}).astype(bool)
         df_assistance[col] = df_assistance[col].apply(lambda x: x if isinstance(x, bool) else False)
 
+    # Create temporary dataframe for calculation
     cols_to_keep = offered_services_cols.copy()
     cols_to_keep.append('VIN')
     tmp_assistance = df_assistance[cols_to_keep].copy()
@@ -261,14 +264,17 @@ def read_prepare_data() -> pd.DataFrame:
     )
 
     cols = ['Rental_Car', 'Hotel_Service', 'Alternative_Transport', 'Taxi_Service', 'Vehicle_Transport',
-                            'Car_Key_Service', 'Parts_Service', 'Additional_Services_Not_Covered']
+            'Car_Key_Service', 'Parts_Service', 'Additional_Services_Not_Covered']
 
     tmp_assistance_grouped['Total Services Offered'] = tmp_assistance_grouped[cols].sum(axis=1)
     top_percent_services_offered = tmp_assistance_grouped['Total Services Offered'].quantile(0.9)
-    tmp_assistance_grouped['SuS_Services_Offered'] = tmp_assistance_grouped['Total Services Offered'] >= top_percent_services_offered
+    tmp_assistance_grouped['SuS_Services_Offered'] = tmp_assistance_grouped[
+                                                         'Total Services Offered'] >= top_percent_services_offered
 
+    # Merge SuS_Services_Offered back to original df_assistance dataframe
     df_assistance = df_assistance.merge(tmp_assistance_grouped[['VIN', 'SuS_Services_Offered']], on='VIN', how='left')
 
+    # Welche VIN bekommt besonders oft einen Ersatzwagen
     # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung der obersten x Prozent, die am meisten Voranrufe in einem Fall haben, mit booleschen Wert
 
     # Obere Prozentzahl
@@ -291,6 +297,33 @@ def read_prepare_data() -> pd.DataFrame:
 
     # Boolean-Spalte erstellen, die angibt, ob eine VIN zu den oberen 30 % gehört
     df_assistance['SUS_Top 30% Rental Car'] = df_assistance['VIN'].apply(lambda x: rental_counts.get(x, 0) > threshold)
+
+    # Berechne die Top 10% der VINs nach Anzahl der Abschleppvorgänge
+    towing_df = df_assistance[df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])]
+    vin_counts = towing_df['VIN'].value_counts()
+    threshold = vin_counts.quantile(0.90)
+    top_10_percent_vins_towing = vin_counts[vin_counts >= threshold].index
+
+    # Berechne, ob dasselbe Auto innerhalb von 14 Tagen nach einem Towing oder Scheduled Towing erneut abgeschleppt wurde
+    df_assistance = df_assistance.sort_values(by=['VIN', 'Incident Date'])
+
+    # Markiere Towing und Scheduled Towing
+    df_assistance['is_towing'] = df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])
+
+    # Berechne die Differenz in Tagen zwischen aufeinanderfolgenden Towing-Events pro VIN
+    df_assistance['days_since_last_towing'] = df_assistance.groupby('VIN')['Incident Date'].diff().dt.days
+
+    # Markiere die Einträge als True, wenn die Differenz 14 Tage oder weniger beträgt
+    df_assistance['SuS_Breakdown'] = df_assistance['days_since_last_towing'].le(14) & df_assistance['is_towing']
+
+    # Fülle NaN-Werte in SuS_Breakdown mit False
+    df_assistance['SuS_Breakdown'] = df_assistance['SuS_Breakdown'].fillna(False)
+
+    # Entferne die Hilfsspalten
+    df_assistance.drop(columns=['is_towing', 'days_since_last_towing'], inplace=True)
+
+    # Füge die neue Spalte SuS_Abschleppungen hinzu
+    df_assistance['SuS_Abschleppungen'] = df_assistance['VIN'].apply(lambda vin: vin in top_10_percent_vins_towing)
 
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)
@@ -454,6 +487,39 @@ def read_prepare_data() -> pd.DataFrame:
     fall_id_to_aufenthalt_id.to_csv(interim_path / 'fall_id_to_aufenthalt_id.csv', index=False)
 
     logger.info('Matched files ... Done')
+
+    # Laden der vorbereiteten Daten
+    # df_assistance_filtered = pd.read_csv('data/interim/assistance.csv')
+    # df_workshop = pd.read_csv('data/interim/workshop.csv')
+    # fall_id_to_aufenthalt_id = pd.read_csv('data/interim/fall_id_to_aufenthalt_id.csv')
+
+    # Filter für "Towing" oder "Scheduled Towing" in der Assistance-Datei
+    df_assistance_filtered_towing = df_assistance_filtered[
+        df_assistance_filtered['Outcome Description'].isin(['Towing', 'Scheduled Towing'])
+    ]
+
+    # Liste der Fall_IDs, die gemerged wurden
+    merged_fall_ids = fall_id_to_aufenthalt_id['Fall_ID'].unique()
+
+    # Fall-IDs, die nicht gemerged wurden
+    unmerged_fall_ids = df_assistance_filtered_towing[~df_assistance_filtered_towing['Fall_ID'].isin(merged_fall_ids)]
+
+    # Ergebnis-DataFrame
+    unmerged_fall_ids_df = unmerged_fall_ids[['Fall_ID', 'VIN', 'Incident Date', 'Outcome Description']]
+
+    # Ausgabe des DataFrames
+    unmerged_fall_ids_df.to_csv('data/interim/unmerged_fall_ids.csv', index=False)
+
+    # Neue Spalte in df_workshop erstellen und mit 'yes'/'no' füllen
+    df_workshop['Unmerged_Towing_STowing_SUS'] = df_workshop['Aufenthalt_ID'].isin(unmerged_fall_ids_df['Fall_ID']).map(
+        {True: 'True', False: 'False'})
+
+    # Speichern der aktualisierten workshop.csv
+    df_workshop.to_csv('data/interim/workshop.csv', index=False)
+
+    # Anzahl der Einträge in unmerged_fall_ids_df ausgeben
+    num_unmerged_entries = len(unmerged_fall_ids_df)
+    print(f"Anzahl der Einträge in unmerged_fall_ids_df: {num_unmerged_entries}")
 
     # ToDo
     # Überpürfen ob Reparaturdaten bei Werkstattaufenthalten identisch sind (Marcs Idee)

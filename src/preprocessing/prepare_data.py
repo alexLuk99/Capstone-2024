@@ -245,6 +245,18 @@ def read_prepare_data() -> pd.DataFrame:
     # Erstellen der neuen Spalte "SuS_Vertragszeitraum"
     df_assistance['SuS_Vertragszeitraum'] = (condition_start_date | condition_end_date)
 
+
+
+    #Welche VIN bekommt besonders oft einen Ersatzwagen
+    rental_counts = df_assistance[df_assistance['Rental Car Days'] > 0].groupby('VIN').size()
+
+    # Schwellenwert für die oberen 30 % bestimmen
+    threshold = rental_counts.quantile(0.7)
+
+    # Boolean-Spalte erstellen, die angibt, ob eine VIN zu den oberen 30 % gehört
+    df_assistance['SUS_Top 30% Rental Car'] = df_assistance['VIN'].apply(lambda x: rental_counts.get(x, 0) > threshold)
+
+
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path = Path('data/interim')
     interim_path.mkdir(parents=True, exist_ok=True)
@@ -405,7 +417,7 @@ def read_prepare_data() -> pd.DataFrame:
 
     merged_df.convert_dtypes()
     merged_df.to_csv('data/interim/merged.csv', index=False)
-    fall_id_to_aufenthalt_id.to_vsc('data/interim/fall_id_to_aufenthalt_id.csv', index=False)
+    fall_id_to_aufenthalt_id.to_csv('data/interim/fall_id_to_aufenthalt_id.csv', index=False)
 
     logger.info('Matched files ... Done')
 

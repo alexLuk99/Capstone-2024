@@ -80,7 +80,7 @@ def read_prepare_data() -> pd.DataFrame:
         registration_date_2 = pd.to_datetime(df_assistance[column], errors='coerce', format='%Y%m%d')
         df_assistance[column] = registration_date_1.fillna(registration_date_2)
 
-    # Bereinigung der "Registration Date" Spalte: Ab 1948 bis 2023
+    #Bereinigung der "Registration Date" Spalte: Ab 1948 bis 2023
 
     df_assistance.loc[
         (df_assistance['Registration Date'].dt.year < 1948) | (df_assistance['Registration Date'].dt.year > 2023),
@@ -370,8 +370,6 @@ def read_prepare_data() -> pd.DataFrame:
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)
 
-    df_assistance = df_assistance.convert_dtypes()
-    df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
 
     logger.info('Prepare assistance report ... done')
     logger.info('Prepare workshop file ...')
@@ -533,6 +531,9 @@ def read_prepare_data() -> pd.DataFrame:
 
     # Aktualisieren der 'Merged'-Spalte basierend auf der Existenz in merge_df
     df_assistance['Merged'] = df_assistance['Fall_ID'].isin(merged_ids)
+
+    df_assistance = df_assistance.convert_dtypes()
+    df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
 
     merged_df.convert_dtypes()
     merged_df.to_csv(interim_path / 'merged.csv', index=False)

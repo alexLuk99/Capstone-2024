@@ -12,3 +12,6 @@ def machine_learning() -> None:
 
     # clustering
     clustering(df_assistance=df_assistance, df_workshop=df_workshop, df_merged=df_merged)
+
+    # categorisation
+    Categorisation(df_assistance=df_assistance, df_workshop=df_workshop, df_merged=df_merged)

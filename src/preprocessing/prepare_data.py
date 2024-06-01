@@ -518,6 +518,22 @@ def read_prepare_data() -> pd.DataFrame:
     fall_id_to_aufenthalt_id = merged_df[['Fall_ID', 'Aufenthalt_ID']].copy()
     fall_id_to_aufenthalt_id = fall_id_to_aufenthalt_id.dropna()
 
+
+    #Implementierung neuer Spalte in Assistance_df für Kontrolle ob in merged_df, mit boolescher Wert
+    # Neue Spalte 'Merged' hinzufügen und initialisieren
+    df_assistance['Merged'] = False
+
+    # Fall_IDs aus merge_df
+    merged_ids = merged_df['Fall_ID']
+
+    # Aktualisieren der 'Merged'-Spalte basierend auf der Existenz in merge_df
+    df_assistance['Merged'] = df_assistance['Fall_ID'].isin(merged_ids)
+
+
+
+
+
+
     merged_df.convert_dtypes()
     merged_df.to_csv(interim_path / 'merged.csv', index=False)
     fall_id_to_aufenthalt_id.to_csv(interim_path / 'fall_id_to_aufenthalt_id.csv', index=False)
@@ -525,9 +541,9 @@ def read_prepare_data() -> pd.DataFrame:
     logger.info('Matched files ... Done')
 
     # Laden der vorbereiteten Daten
-    # df_assistance_filtered = pd.read_csv('data/interim/assistance.csv')
-    # df_workshop = pd.read_csv('data/interim/workshop.csv')
-    # fall_id_to_aufenthalt_id = pd.read_csv('data/interim/fall_id_to_aufenthalt_id.csv')
+    #df_assistance_filtered = pd.read_csv('data/interim/assistance.csv')
+    #df_workshop = pd.read_csv('data/interim/workshop.csv')
+    #fall_id_to_aufenthalt_id = pd.read_csv('data/interim/fall_id_to_aufenthalt_id.csv')
 
     # Filter für "Towing" oder "Scheduled Towing" in der Assistance-Datei
     df_assistance_filtered_towing = df_assistance_filtered[

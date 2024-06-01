@@ -8,14 +8,15 @@ from sklearn.preprocessing import StandardScaler
 def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, df_merged: pd.DataFrame, ) -> None:
     # Create dataframe with most important information
 
-    cols = ['Telephone Help', 'Service Paid By Customer', 'Rental Car', 'Hotel Service', 'Alternative Transport',
-            'Taxi Service', 'Vehicle Transport', 'Car Key Service', 'Parts Service', 'Additional Services Not Covered']
+    cols = ['Telephone Help', 'Service Paid By Customer']
 
     for col in cols:
         df_assistance[col] = df_assistance[col].fillna('NO')
         df_assistance[col] = df_assistance[col].str.upper()
-        df_assistance[col] = df_assistance[col].replace({'YES': True, 'NO': False})
+        df_assistance[col] = df_assistance[col].map({'YES': True, 'NO': False}).astype(bool)
         df_assistance[col] = df_assistance[col].apply(lambda x: x if isinstance(x, bool) else False)
+
+    df_assistance['Rental Car Days'] = df_assistance['Rental Car Days'].fillna(0)
 
     df_assistance_grouped = df_assistance.groupby(by='VIN', as_index=False).agg(
         Anzahl_Anrufe=pd.NamedAgg(column='Incident Date', aggfunc='count'),

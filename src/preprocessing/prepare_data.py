@@ -4,6 +4,7 @@ from loguru import logger
 
 import pandas as pd
 import altair as alt
+from scipy.stats import stats
 
 from config.paths import input_path, interim_path, output_path
 
@@ -277,32 +278,32 @@ def read_prepare_data() -> pd.DataFrame:
     # Welche VIN bekommt besonders oft einen Ersatzwagen
     # Implementierung einer neuen Spalte in Assistance_df für Kennzeichnung der obersten x Prozent, die am meisten Voranrufe in einem Fall haben, mit booleschen Wert
 
-    # Obere Prozentzahl
-    x = 20
+    # Quantile
+    quant = 0.75
 
     # Berechnen der Anzahl der Vorkommen jeder 'Fall_ID'
     fall_id_counts = df_assistance['Fall_ID'].value_counts()
 
-    # Berechnen des Schwellenwertes für die obersten x%
-    threshold = fall_id_counts.quantile((100 - x) / 100)
+    # Berechnen des Schwellenwertes für die obersten 25%
+    threshold = fall_id_counts.quantile(quant)
 
     # Erstellen der neuen Spalte 'SuS_AnrufeInFall'
     df_assistance['SuS_AnrufeInFall'] = df_assistance['Fall_ID'].map(fall_id_counts) > threshold
 
-    #Welche VIN bekommt besonders oft einen Ersatzwagen
+    # Welche VIN bekommt besonders oft einen Ersatzwagen
     rental_counts = df_assistance[df_assistance['Rental Car Days'] > 0].groupby('VIN').size()
 
-    # Schwellenwert für die oberen 30 % bestimmen
-    threshold = rental_counts.quantile(0.7)
+    # Schwellenwert für die oberen 25 % bestimmen
+    threshold = rental_counts.quantile(quant)
 
     # Boolean-Spalte erstellen, die angibt, ob eine VIN zu den oberen 30 % gehört
-    df_assistance['SUS_Top 30% Rental Car'] = df_assistance['VIN'].apply(lambda x: rental_counts.get(x, 0) > threshold)
+    df_assistance['SuS_Rental_Car'] = df_assistance['VIN'].apply(lambda x: rental_counts.get(x, 0) > threshold)
 
-    # Berechne die Top 10% der VINs nach Anzahl der Abschleppvorgänge
+    # Berechne die Top 25% der VINs nach Anzahl der Abschleppvorgänge
     towing_df = df_assistance[df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])]
     vin_counts = towing_df['VIN'].value_counts()
-    threshold = vin_counts.quantile(0.90)
-    top_10_percent_vins_towing = vin_counts[vin_counts >= threshold].index
+    threshold = vin_counts.quantile(quant)
+    top_vins_towing = vin_counts[vin_counts >= threshold].index
 
     # Berechne, ob dasselbe Auto innerhalb von 14 Tagen nach einem Towing oder Scheduled Towing erneut abgeschleppt wurde
     df_assistance = df_assistance.sort_values(by=['VIN', 'Incident Date'])
@@ -323,7 +324,42 @@ def read_prepare_data() -> pd.DataFrame:
     df_assistance.drop(columns=['is_towing', 'days_since_last_towing'], inplace=True)
 
     # Füge die neue Spalte SuS_Abschleppungen hinzu
-    df_assistance['SuS_Abschleppungen'] = df_assistance['VIN'].apply(lambda vin: vin in top_10_percent_vins_towing)
+    df_assistance['SuS_Abschleppungen'] = df_assistance['VIN'].apply(lambda vin: vin in top_vins_towing)
+
+    sus_columns = ['SuS_Anruferzahl', 'SuS_Vertragszeitraum', 'SuS_Services_Offered', 'SuS_AnrufeInFall',
+                   'SuS_Rental_Car', 'SuS_Breakdown', 'SuS_Abschleppungen']
+
+    df_assistance['SuS-O-Meter'] = df_assistance[sus_columns].sum(axis=1) / len(sus_columns)
+
+    df = pd.DataFrame(df_assistance['SuS-O-Meter'])
+    mean = df['SuS-O-Meter'].mean()
+    std = df['SuS-O-Meter'].std()
+    df['SuS-O-Meter-Standardized'] = (df['SuS-O-Meter'] - mean) / std
+
+    chart = alt.Chart(df).mark_bar().encode(
+        alt.X('SuS-O-Meter:Q', bin=True, title='SuS-O-Meter'),
+        alt.Y('count()', title='Anzahl')
+    ).properties(
+        title='Verteilung des SuS-O-Meters'
+    )
+
+    chart_stand = alt.Chart(df).mark_bar().encode(
+        alt.X('SuS-O-Meter-Standardized:Q', bin=True, title='Normalisierte SuS-O-Meter'),
+        alt.Y('count()', title='Anzahl')
+    ).properties(
+        title='Verteilung des standardisierten SuS-O-Meters'
+    )
+
+    box = alt.Chart(df).mark_boxplot().encode(
+        y='SuS-O-Meter:Q'
+    ).properties(
+        title='Boxplot des SuS-O-Meters'
+    )
+
+    chart.save(output_path / 'susometer.html')
+    chart_stand.save(output_path / 'susometer_stand.html')
+    box.save(output_path / 'susometer_box.html')
+
 
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)

@@ -1,12 +1,23 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import altair as alt
 from joblib import load
+from loguru import logger
 
 from sklearn.decomposition import PCA
 
 from config.paths import input_path, output_path, interim_path, models_path
+
+
+def remove_outliers(df, col):
+    q1 = df[col].quantile(0.25)
+    q3 = df[col].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    return df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
 
 
 def analyze_clusters():
@@ -32,6 +43,8 @@ def analyze_clusters():
         height=600
     )
 
+    df_clustered = df_clustered.drop(columns=['PCA1', 'PCA2'])
+
     # Speichern des Plots
     scatter_plot.save(output_path / 'cluster_visualization.html')
 
@@ -53,6 +66,7 @@ def analyze_clusters():
 
     # Histogramm für 'Durschnittliche_Zeit_zwischen_Towings'
     tmp_towings = df_clustered[['VIN', 'Cluster', 'Durschnittliche_Zeit_zwischen_Towings']]
+    tmp_towings = tmp_towings[tmp_towings['Durschnittliche_Zeit_zwischen_Towings'] > 0].copy()
     hist_towings = alt.Chart(tmp_towings).mark_bar().encode(
         x=alt.X('Durschnittliche_Zeit_zwischen_Towings:Q', bin=alt.Bin(maxbins=10, step=30)),
         y='count()',
@@ -72,7 +86,7 @@ def analyze_clusters():
     scatter_repairs_vs_aufenthalte = alt.Chart(tmp_repairs_vs_aufenthalte).mark_circle(size=60).encode(
         x='Repairs:Q',
         y='Aufenthalte:Q',
-        color='Cluster:N',
+        column='Cluster:N',
         tooltip=['VIN', 'Cluster']
     ).properties(
         title='Scatter Plot of Repairs vs. Aufenthalte by Cluster'
@@ -187,6 +201,69 @@ def analyze_clusters():
     )
 
     dist_component.save(output_path / 'distribution_component.html')
+
+    # Cluster DataFrames erstellen
+    clusters = df_clustered['Cluster'].unique()
+    cluster_dfs = {cluster: df_clustered[df_clustered['Cluster'] == cluster] for cluster in clusters}
+
+    results = {}
+
+    for cluster, df in cluster_dfs.items():
+        numerical_means = df.select_dtypes(include=[np.number]).mean()
+        numerical_median = df.select_dtypes(include=[np.number]).median()
+        nominal_distributions = {}
+
+        for col in df.select_dtypes(include=['object', 'bool']).columns:
+            nominal_distributions[col] = df[col].value_counts(normalize=True)
+
+        results[cluster] = {
+            'Numerical Means': numerical_means,
+            'Numerical Medians': numerical_median,
+            'Nominal Distributions': nominal_distributions
+        }
+
+    result_df = pd.DataFrame()
+
+    mean_results = []
+    for c in results:
+        mean_results.append(results[c].get('Numerical Means'))
+
+    mean_result_df = pd.concat(mean_results, axis=1).reset_index(names='Feature')
+    mean_result_df = mean_result_df.melt(value_vars=[0, 1, 2], var_name='Cluster', value_name='Mean',
+                                         id_vars=['Feature'])
+
+    median_results = []
+    for c in results:
+        median_results.append(results[c].get('Numerical Medians'))
+
+    median_result_df = pd.concat(median_results, axis=1).reset_index(names='Feature')
+    median_result_df = median_result_df.melt(value_vars=[0, 1, 2], var_name='Cluster', value_name='Median',
+                                             id_vars=['Feature'])
+
+    result_df = mean_result_df.merge(median_result_df, on=['Feature', 'Cluster'], how='left')
+
+    result_df = result_df.melt(value_vars=['Mean', 'Median'], value_name='Value', var_name='Typ', id_vars=['Feature', 'Cluster'])
+
+    chart = alt.Chart(result_df).mark_point().encode(
+        x='Cluster:N',
+        y=alt.Y('Value:Q', scale=alt.Scale(zero=False)),
+        color='Cluster:N',
+        shape='Typ:N',
+        tooltip=['Feature', 'Cluster', 'Typ', 'Value']
+    ).properties(
+        width=100,
+        height=400
+    ).facet(
+        column='Feature:N'
+    ).resolve_scale(
+        y='independent'
+    )
+
+    chart.save('test.html')
+
+    result_df.to_excel(output_path / 'Mittelwerte.xlsx')
+
+    numerical_columns = df_clustered.select_dtypes(include=['number']).columns.tolist()
 
 
 def interpret_pca_loadings(loadings, top_n=5):

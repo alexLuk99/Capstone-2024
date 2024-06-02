@@ -1,7 +1,10 @@
 import pandas as pd
 from config.paths import interim_path
+from src.ml.models.analyze_clusters import analyze_clusters
 from src.ml.models.classification import classification
 from src.ml.models.clustering import clustering
+
+
 
 
 def machine_learning() -> None:
@@ -13,6 +16,7 @@ def machine_learning() -> None:
 
     # clustering
     clustering(df_assistance=df_assistance, df_workshop=df_workshop)
+    analyze_clusters()
 
     # categorisation
-    classification(df_assistance=df_assistance, df_workshop=df_workshop)
+    # classification(df_assistance=df_assistance, df_workshop=df_workshop)

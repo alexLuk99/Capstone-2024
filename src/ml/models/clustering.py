@@ -15,7 +15,7 @@ from config.paths import input_path, interim_path, output_path
 os.environ['LOKY_MAX_CPU_COUNT'] = str(os.cpu_count())
 
 
-def clustering(df_assistance: pd.DataFrame) -> None:
+def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame) -> None:
     # Create dataframe with most important information
 
     cols = ['Telephone Help', 'Service Paid By Customer']
@@ -53,7 +53,7 @@ def clustering(df_assistance: pd.DataFrame) -> None:
 
     df_assistance = df_assistance.sort_values(by=['Registration Date', 'VIN'])
     df_assistance_first_registration_date = df_assistance[['VIN', 'Registration Date']].drop_duplicates(
-        subset=['VIN', 'Registration Date'])
+        subset=['VIN'])
     df_assistance_first_registration_date['Registration Date'] = pd.to_datetime(
         df_assistance_first_registration_date['Registration Date'])
     df_assistance_first_registration_date['Registration Date Jahr'] = df_assistance_first_registration_date[
@@ -67,14 +67,14 @@ def clustering(df_assistance: pd.DataFrame) -> None:
     df_assistance['Modellreihe'] = df_assistance['Modellreihe'].fillna('Nicht definiert')
     df_assistance['Modellreihe_Encoded'] = label_encoder.fit_transform(df_assistance['Modellreihe'])
 
-    tmp_modellreihe = df_assistance[['VIN', 'Modellreihe_Encoded']].copy().drop_duplicates()
+    tmp_modellreihe = df_assistance[['VIN']].copy().drop_duplicates()
     df_assistance_grouped = df_assistance_grouped.merge(tmp_modellreihe, on='VIN')
 
     # Label Encodign der Spalte Fahrzeuggruppe
     df_assistance['Fahrzeuggruppe'] = df_assistance['Fahrzeuggruppe'].fillna('Nicht definiert')
     df_assistance['Fahrzeuggruppe_Encoded'] = label_encoder.fit_transform(df_assistance['Fahrzeuggruppe'])
 
-    tmp_fahrzeuggruppe = df_assistance[['VIN', 'Fahrzeuggruppe_Encoded']].copy().drop_duplicates()
+    tmp_fahrzeuggruppe = df_assistance[['VIN']].copy().drop_duplicates()
     df_assistance_grouped = df_assistance_grouped.merge(tmp_fahrzeuggruppe, on='VIN')
 
     # Spalten als features hinzufügen
@@ -84,6 +84,18 @@ def clustering(df_assistance: pd.DataFrame) -> None:
         tmp = df_assistance.pivot_table(index='VIN', columns=col, aggfunc='size', fill_value=0).reset_index()
         df_assistance_grouped = df_assistance_grouped.merge(tmp, on='VIN', how='left')
         df_assistance_grouped = df_assistance_grouped.fillna(0)
+
+    # Anzahl Reperaturen pro VIN
+    df_repairs = df_workshop.groupby(by='VIN', as_index=False).agg(
+        Repairs=pd.NamedAgg(column='Q-Line', aggfunc='count'),
+    )
+
+    df_aufenthalte = df_workshop.groupby(by='VIN', as_index=False).agg(
+        Aufenthalte=pd.NamedAgg(column='Werkstattaufenthalt', aggfunc='nunique')
+    )
+
+    df_assistance_grouped = df_assistance_grouped.merge(df_repairs, on='VIN', how='left')
+    df_assistance_grouped = df_assistance_grouped.merge(df_aufenthalte, on='VIN', how='left')
 
     # Set VIN as Index
     data = df_assistance_grouped.copy()
@@ -130,7 +142,7 @@ def clustering(df_assistance: pd.DataFrame) -> None:
 
     # Display both plots
     combined_plot = elbow_plot | cumulative_plot
-    combined_plot.save('test.html')
+    combined_plot.save(output_path / 'elbow_cum_variance.html')
 
     pipeline = Pipeline([
         ('scaler', MaxAbsScaler()),
@@ -143,7 +155,7 @@ def clustering(df_assistance: pd.DataFrame) -> None:
     # Finding the optimal number of clusters using the Silhouette Score
     silhouette_scores = []
 
-    k_s = range(2, 5)
+    k_s = range(2, 8)
     # Finding the optimal number of clusters using the Silhouette Score and creating Silhouette Plots
     for n_clusters in k_s:
         fig, ax1 = plt.subplots(1, 1)

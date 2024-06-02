@@ -23,4 +23,4 @@ def machine_learning(train_model: bool) -> None:
     classification_suspect(data=data_suspect, train_model=train_model)
 
     # categorisation
-    classification(df_assistance=df_assistance, df_workshop=df_workshop)
+    classification(df_assistance=df_assistance, df_workshop=df_workshop, save_path='data/output')

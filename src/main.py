@@ -7,9 +7,10 @@ from config.paths import input_path, interim_path, output_path
 
 
 class Capstone:
-    def __init__(self, runners: List):
+    def __init__(self, runners: List, train_cluster_model: bool):
         self.data = None
         self.runners = runners
+        self.train_cluster_model = train_cluster_model
 
     def run(self):
         if not input_path.exists():
@@ -33,4 +34,4 @@ class Capstone:
         analyse_data()
 
     def machine_learning(self):
-        machine_learning()
+        machine_learning(train_cluster_model=self.train_cluster_model)

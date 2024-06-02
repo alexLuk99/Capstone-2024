@@ -18,8 +18,9 @@ from config.paths import interim_path, output_path, models_path
 os.environ['LOKY_MAX_CPU_COUNT'] = str(os.cpu_count())
 
 
-def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, train_model: bool = False) -> None:
+def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, train_model: bool = True) -> None:
     kmeans_path = Path(models_path / 'kmeans_model.joblib')
+    label_encoder_path = Path(models_path / 'label_encoders.joblib')
 
     # Create dataframe with most important information
     cols = ['Telephone Help', 'Service Paid By Customer']
@@ -66,19 +67,15 @@ def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, train_mod
     df_assistance_grouped = df_assistance_grouped.merge(df_assistance_first_registration_date, on='VIN', how='left')
 
     # Label Encoding der Spalte Modellreihe
-    label_encoder = LabelEncoder()
+    label_encoder_modellreihe = LabelEncoder()
     df_assistance['Modellreihe'] = df_assistance['Modellreihe'].fillna('Nicht definiert')
-    df_assistance['Modellreihe_Encoded'] = label_encoder.fit_transform(df_assistance['Modellreihe'])
+    df_assistance['Modellreihe_Encoded'] = label_encoder_modellreihe.fit_transform(df_assistance['Modellreihe'])
 
-    tmp_modellreihe = df_assistance[['VIN']].copy().drop_duplicates()
+    tmp_modellreihe = df_assistance[['VIN', 'Modellreihe_Encoded']].copy().drop_duplicates(subset='VIN')
     df_assistance_grouped = df_assistance_grouped.merge(tmp_modellreihe, on='VIN')
 
-    # Label Encoding der Spalte Fahrzeuggruppe
-    df_assistance['Fahrzeuggruppe'] = df_assistance['Fahrzeuggruppe'].fillna('Nicht definiert')
-    df_assistance['Fahrzeuggruppe_Encoded'] = label_encoder.fit_transform(df_assistance['Fahrzeuggruppe'])
-
-    tmp_fahrzeuggruppe = df_assistance[['VIN']].copy().drop_duplicates()
-    df_assistance_grouped = df_assistance_grouped.merge(tmp_fahrzeuggruppe, on='VIN')
+    # Save the label encoders
+    dump(label_encoder_modellreihe, label_encoder_path)
 
     # Spalten als features hinzufügen
     cols_to_pivot = ['Outcome Description', 'Component']
@@ -111,6 +108,10 @@ def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, train_mod
     # Applying PCA
     pca = PCA(n_components=features_scaled.shape[1])
     pca.fit(features_scaled)
+
+    # Zurückgeben welche Spalten in PCA einfließen
+    numerical_features = data.columns.tolist()
+    loadings = pd.DataFrame(pca.components_.T, index=numerical_features)
 
     # Explained variance ratio
     explained_variance = pca.explained_variance_ratio_

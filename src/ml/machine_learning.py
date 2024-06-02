@@ -16,7 +16,7 @@ def machine_learning() -> None:
 
     # clustering
     # clustering(df_assistance=df_assistance, df_workshop=df_workshop)
-    analyze_clusters()
+    # analyze_clusters()
 
     # categorisation
-    # classification(df_assistance=df_assistance, df_workshop=df_workshop)
+    classification(df_assistance=df_assistance, df_workshop=df_workshop, save_path='data/output/roc_curve.png')

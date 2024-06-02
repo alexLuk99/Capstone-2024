@@ -1,14 +1,14 @@
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
 import xgboost as xgb
+import matplotlib.pyplot as plt
 
-def classification(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame) -> None:
+def classification(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, save_path: str) -> None:
     # 'VIN' als Index setzen
     df_assistance.set_index('VIN', inplace=True)
 
@@ -82,6 +82,7 @@ def classification(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame) -> No
     print(classification_report(y_test, y_pred))
 
     # ROC-Kurve und AUC berechnen
+    y_pred_proba = best_model.predict_proba(X_test)[:, 1]
     fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
     roc_auc = auc(fpr, tpr)
 

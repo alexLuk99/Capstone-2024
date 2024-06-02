@@ -4,41 +4,44 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder, FunctionTransformer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
 import xgboost as xgb
-from sklearn.linear_model import LogisticRegression
-
 
 def classification(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame) -> None:
     # 'VIN' als Index setzen
     df_assistance.set_index('VIN', inplace=True)
 
-    df_repairs = df_workshop.groupby(by='VIN')['Q-Line'].count()
+    # Gruppieren und Zählen der Reparaturen pro 'VIN'
+    df_repairs = df_workshop.groupby('VIN')['Q-Line'].count().rename('Anzahl Q-Line')
 
-    # Rename der Spalte
-
+    # Merge der Reparaturen in df_assistance
     df_assistance = df_assistance.merge(df_repairs, left_index=True, right_index=True, how='left')
+    df_assistance['Anzahl Q-Line'].fillna(0, inplace=True)  # Fehlende Werte auffüllen
 
     # Features und Labels trennen
-    X = df_assistance[
-        ['Country Of Incident', 'Handling Call Center', 'Baureihe', 'Component', 'Outcome Description',
-         'RSA Successful']]
+    X = df_assistance[['Country Of Incident', 'Handling Call Center', 'Baureihe', 'Component', 'Outcome Description', 'RSA Successful', 'Anzahl Q-Line']]
     y = df_assistance['Merged']
 
-    # Kategorische Daten mit LabelEncoder kodieren
-    categorical_columns = ['Country Of Incident', 'Handling Call Center', 'Baureihe', 'Component',
-                           'Outcome Description', 'RSA Successful']
+    # Definieren der Transformer für kategorische und numerische Daten
+    categorical_columns = ['Country Of Incident', 'Handling Call Center', 'Baureihe', 'Component', 'Outcome Description', 'RSA Successful']
+    numerical_columns = ['Anzahl Q-Line']
 
     categorical_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='most_frequent')),
         ('onehot', OneHotEncoder(handle_unknown='ignore'))
     ])
 
+    numerical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='mean')),
+        ('scaler', StandardScaler())
+    ])
+
     # ColumnTransformer zur Anwendung der jeweiligen Transformer auf die entsprechenden Spalten
     preprocessor = ColumnTransformer(
         transformers=[
-            ('cat', categorical_transformer, categorical_columns)
+            ('cat', categorical_transformer, categorical_columns),
+            ('num', numerical_transformer, numerical_columns)
         ])
 
     # Pipeline für den gesamten Prozess
@@ -81,7 +84,6 @@ def classification(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame) -> No
     # Feature-Wichtigkeit anzeigen
     model = best_model.named_steps['classifier']
     feature_importances = model.feature_importances_
-    feature_names = best_model.named_steps['preprocessor'].transformers_[0][1]['onehot'].get_feature_names_out(
-        categorical_columns)
+    feature_names = best_model.named_steps['preprocessor'].transformers_[0][1]['onehot'].get_feature_names_out(categorical_columns)
     importances = pd.Series(feature_importances, index=feature_names)
     print(importances.sort_values(ascending=False))

@@ -26,6 +26,155 @@ def analyse_data() -> None:
     output_path = Path('output')
     output_path.mkdir(exist_ok=True, parents=True)
 
+    # Berechne die Anzahl der Werkstattaufenthalte pro VIN
+    df_workshop_count = df_merged['VIN'].value_counts().reset_index()
+    df_workshop_count.columns = ['VIN', 'Workshop_Count']
+
+    # Merge mit df_merged, um die Anzahl der Werkstattaufenthalte hinzuzufügen
+    df_merged = df_merged.merge(df_workshop_count, on='VIN', how='left')
+
+    # Identifiziere die VINs mit hohen Werkstattaufenthalten (z.B. oberes 10% Quantil)
+    high_workshop_threshold = df_workshop_count['Workshop_Count'].quantile(0.90)
+    high_workshop_vins = df_workshop_count[df_workshop_count['Workshop_Count'] >= high_workshop_threshold]['VIN']
+
+    # Filtern der Einträge mit hohen Werkstattaufenthalten
+    df_high_workshop = df_merged[df_merged['VIN'].isin(high_workshop_vins)]
+
+    # Berechne die häufigsten Werkstätten (Händler Q-Line) für diese VINs
+    df_high_workshop_count = df_high_workshop['Händler Q-Line'].value_counts().reset_index()
+    df_high_workshop_count.columns = ['Händler Q-Line', 'Count']
+
+    # Visualisierung der Verteilung der häufigen Werkstätten
+    chart = alt.Chart(df_high_workshop_count).mark_bar().encode(
+        x=alt.X('Händler Q-Line:N', title='Händler Q-Line'),
+        y=alt.Y('Count:Q', title='Anzahl der Werkstattaufenthalte'),
+        tooltip=['Händler Q-Line', 'Count']
+    ).properties(
+        title='Häufigkeit der Werkstätten (Händler Q-Line) für VINs mit hohen Werkstattaufenthalten',
+        width=2600,
+        height=2400
+    )
+
+    # Speichern der Visualisierung
+    chart_path = output_path / 'high_workshop_vins_händler_qline.html'
+    chart.save(chart_path)
+    print(f"Visualisierung gespeichert unter: {chart_path}")
+
+    # Filter Einträge mit der Q-Line '2600003'
+    df_händler = df_merged[df_merged['Händler Q-Line'] == 2600003]
+
+    # Überprüfen, ob Einträge vorhanden sind
+    if df_händler.empty:
+        print("Keine Einträge mit der Q-Line '2600003' gefunden.")
+        return
+
+    # SoS-O-Meter Scores der Autos, die bei diesem Händler waren
+    sos_o_meter_scores = df_händler[['VIN', 'SuS-O-Meter']]
+
+    # Ausgabe der SoS-O-Meter Scores
+    print("SoS-O-Meter Scores der Autos bei Händler Q-Line 2600003:")
+    print(sos_o_meter_scores)
+
+    # Visualisierung der SoS-O-Meter Scores
+    chart = alt.Chart(sos_o_meter_scores).mark_bar().encode(
+        x=alt.X('VIN:N', title='VIN'),
+        y=alt.Y('SuS-O-Meter:Q', title='SoS-O-Meter Score'),
+        tooltip=['VIN', 'SuS-O-Meter']
+    ).properties(
+        title='SoS-O-Meter Scores der Autos bei Händler Q-Line 2600003',
+        width=800,
+        height=400
+    )
+
+    # Speichern der Visualisierung
+    chart_path = output_path / 'sos_o_meter_scores_händler_2600003.html'
+    chart.save(chart_path)
+    print(f"Visualisierung gespeichert unter: {chart_path}")
+
+    # Filter Einträge mit der Q-Line '2600003'
+    df_händler = df_merged[df_merged['Händler Q-Line'] == '2600003']
+
+    # Überprüfen, ob Einträge vorhanden sind
+    if df_händler.empty:
+        print("Keine Einträge mit der Q-Line '2600003' gefunden.")
+        return
+
+    # Anzahl der Aufenthalte pro VIN bei der besagten Werkstatt
+    vin_counts = df_händler['VIN'].value_counts().reset_index()
+    vin_counts.columns = ['VIN', 'Count']
+
+    # SoS-O-Meter Scores der Autos, die bei diesem Händler waren
+    sos_o_meter_scores = df_händler[['VIN', 'SuS-O-Meter']].drop_duplicates()
+
+    # Zusammenführen der Daten
+    merged_data = pd.merge(vin_counts, sos_o_meter_scores, on='VIN')
+
+    # Visualisierung der SoS-O-Meter Scores als Scatterplot
+    scatterplot = alt.Chart(merged_data).mark_point().encode(
+        x=alt.X('Count:Q', title='Anzahl der Aufenthalte bei Händler 2600003'),
+        y=alt.Y('SuS-O-Meter:Q', title='SoS-O-Meter Score'),
+        tooltip=['VIN', 'Count', 'SuS-O-Meter']
+    ).properties(
+        title='SoS-O-Meter Scores der Autos bei Händler Q-Line 2600003',
+        width=800,
+        height=400
+    )
+
+    # Speichern der Visualisierung
+    chart_path = output_path / 'sos_o_meter_scores_händler_2600003_scatter.html'
+    scatterplot.save(chart_path)
+    print(f"Visualisierung gespeichert unter: {chart_path}")
+
+    # Hinzufügen einer Indikatorspalte, die anzeigt, ob die Q-Line fehlt
+    df_merged['Q-Line Missing'] = df_merged['Q-Line'].isna().astype(int)  # Konvertieren zu int
+
+    # Korrelationen zwischen der Indikatorspalte und anderen numerischen Variablen berechnen
+    numeric_cols = df_merged.select_dtypes(include=['number']).columns
+    correlation_matrix = df_merged[numeric_cols].corr()
+
+    # Korrelationen mit 'Q-Line Missing' extrahieren
+    q_line_corr = correlation_matrix['Q-Line Missing'].drop('Q-Line Missing').sort_values(ascending=False)
+
+    # Ausgabe der Korrelationen
+    print(q_line_corr)
+
+    # Umwandlung der Korrelationsmatrix in ein langes Format
+    corr_matrix_long = correlation_matrix.reset_index().melt(id_vars='index')
+    corr_matrix_long.columns = ['Variable1', 'Variable2', 'Correlation']
+
+    # Visualisierung der Korrelationsmatrix mit Altair
+    base = alt.Chart(corr_matrix_long).encode(
+        x=alt.X('Variable1:O', title='Variable 1'),
+        y=alt.Y('Variable2:O', title='Variable 2')
+    )
+
+    heatmap = base.mark_rect().encode(
+        color=alt.Color('Correlation:Q', scale=alt.Scale(scheme='viridis')),
+        tooltip=['Variable1', 'Variable2', 'Correlation']
+    )
+
+    text = base.mark_text(baseline='middle').encode(
+        text=alt.Text('Correlation:Q', format='.2f'),
+        color=alt.condition(
+            alt.datum.Correlation > 0.5,  # Helle Farbe für positive Korrelationen
+            alt.value('black'),
+            alt.value('white')
+        )
+    )
+
+    chart = heatmap + text
+
+    chart = chart.properties(
+        title='Correlation Heatmap',
+        width=600,
+        height=600
+    )
+
+    # Speichern der Heatmap
+    heatmap_path = output_path / 'correlation_heatmapppppp.html'
+    chart.save(heatmap_path)
+    print("Heatmap saved as", heatmap_path)
+
     # Filter nur numerische Spalten für die Berechnung der Korrelationsmatrix
     numeric_cols = df_merged.select_dtypes(include=['number']).columns
     df_numeric = df_merged[numeric_cols]

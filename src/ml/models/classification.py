@@ -84,6 +84,12 @@ def classification(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame) -> No
     # Feature-Wichtigkeit anzeigen
     model = best_model.named_steps['classifier']
     feature_importances = model.feature_importances_
-    feature_names = best_model.named_steps['preprocessor'].transformers_[0][1]['onehot'].get_feature_names_out(categorical_columns)
-    importances = pd.Series(feature_importances, index=feature_names)
+
+    # Holen der Feature-Namen
+    categorical_features = best_model.named_steps['preprocessor'].named_transformers_['cat'][
+        'onehot'].get_feature_names_out(categorical_columns)
+    numerical_features = numerical_columns  # numerische Features haben keine Transformation
+    all_features = list(categorical_features) + numerical_features
+
+    importances = pd.Series(feature_importances, index=all_features)
     print(importances.sort_values(ascending=False))

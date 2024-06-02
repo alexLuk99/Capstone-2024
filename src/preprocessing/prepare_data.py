@@ -80,7 +80,7 @@ def read_prepare_data() -> pd.DataFrame:
         registration_date_2 = pd.to_datetime(df_assistance[column], errors='coerce', format='%Y%m%d')
         df_assistance[column] = registration_date_1.fillna(registration_date_2)
 
-    #Bereinigung der "Registration Date" Spalte: Ab 1948 bis 2023
+    # Bereinigung der "Registration Date" Spalte: Ab 1948 bis 2023
 
     df_assistance.loc[
         (df_assistance['Registration Date'].dt.year < 1948) | (df_assistance['Registration Date'].dt.year > 2023),
@@ -381,9 +381,35 @@ def read_prepare_data() -> pd.DataFrame:
     chart_stand.save(output_path / 'susometer_stand.html')
     box.save(output_path / 'susometer_box.html')
 
+    #%%
+
+    # Berechnung der statistischen Werte und Quantile
+    stats_df = df_assistance['SuS-O-Meter'].describe(percentiles=[0.25, 0.5, 0.75, 0.9, 0.95, 0.99])
+
+    # Ausgabe der statistischen Werte
+    print(stats_df)
+
+    # Speicherung der statistischen Werte in eine Datei
+    stats_df.to_csv(output_path / 'susometer_stats.csv')
+
+#%%
+
+    # Berechnung des obersten Quantils (z.B. 0.x Quantil)
+    upper_quantile = df_assistance['SuS-O-Meter'].quantile(0.90)
+
+    # Hinzufügen der neuen Spalte
+    df_assistance['Suspect'] = df_assistance['SuS-O-Meter'] >= upper_quantile
+
+    suspect_counts = df_assistance['Suspect'].value_counts()
+
+    # Ausgabe der Häufigkeit
+    print(suspect_counts)
+
+    #%%
+
+
     # Erstellen des Zwischenpfads und Speichern der Datei
     interim_path.mkdir(parents=True, exist_ok=True)
-
 
     logger.info('Prepare assistance report ... done')
     logger.info('Prepare workshop file ...')
@@ -536,22 +562,25 @@ def read_prepare_data() -> pd.DataFrame:
     fall_id_to_aufenthalt_id = merged_df[['Fall_ID', 'Aufenthalt_ID']].copy()
     fall_id_to_aufenthalt_id = fall_id_to_aufenthalt_id.dropna()
 
-    # Implementierung neuer Spalte in Assistance_df für Kontrolle ob in merged_df, mit boolescher Wert
-    # Neue Spalte 'Merged' hinzufügen und initialisieren
-    df_assistance['Merged'] = False
-
-    # Fall_IDs aus merge_df
-    merged_ids = merged_df['Fall_ID']
-
-    # Aktualisieren der 'Merged'-Spalte basierend auf der Existenz in merge_df
-    df_assistance['Merged'] = df_assistance['Fall_ID'].isin(merged_ids)
-
-    df_assistance = df_assistance.convert_dtypes()
-    df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
+    fall_id_to_aufenthalt_id = fall_id_to_aufenthalt_id.convert_dtypes()
+    fall_id_to_aufenthalt_id.to_csv(interim_path / 'fall_id_to_aufenthalt_id.csv', index=False)
 
     merged_df.convert_dtypes()
     merged_df.to_csv(interim_path / 'merged.csv', index=False)
-    fall_id_to_aufenthalt_id.to_csv(interim_path / 'fall_id_to_aufenthalt_id.csv', index=False)
+
+    # Implementierung neuer Spalte in df_assistance für Kontrolle ob in merged_df, mit booleschem Wert
+    # Neue Spalte 'Merged' hinzufügen und initialisieren
+    df_assistance['Merged'] = False
+
+    # Fall_IDs aus merged_df
+    merged_df = merged_df[~merged_df['Q-Line'].isna()]
+    merged_ids = merged_df['Case Number']
+
+    # Aktualisieren der 'Merged'-Spalte basierend auf der Existenz in merged_df
+    df_assistance['Merged'] = df_assistance['Case Number'].isin(merged_ids)
+
+    df_assistance = df_assistance.convert_dtypes()
+    df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
 
     logger.info('Matched files ... Done')
 

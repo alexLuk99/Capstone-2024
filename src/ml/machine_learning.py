@@ -1,5 +1,6 @@
 import pandas as pd
 from config.paths import interim_path
+from src.ml.models.classification import classification
 from src.ml.models.clustering import clustering
 
 
@@ -11,7 +12,7 @@ def machine_learning() -> None:
     # classification with leads
 
     # clustering
-    clustering(df_assistance=df_assistance, df_workshop=df_workshop, df_merged=df_merged)
+    # clustering(df_assistance=df_assistance)
 
     # categorisation
-    Categorisation(df_assistance=df_assistance, df_workshop=df_workshop, df_merged=df_merged)
+    classification(df_assistance=df_assistance)

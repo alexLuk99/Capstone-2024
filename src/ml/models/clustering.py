@@ -12,10 +12,10 @@ import matplotlib.pyplot as plt
 from loguru import logger
 from config.paths import input_path, interim_path, output_path
 
-
 os.environ['LOKY_MAX_CPU_COUNT'] = str(os.cpu_count())
 
-def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, df_merged: pd.DataFrame, ) -> None:
+
+def clustering(df_assistance: pd.DataFrame) -> None:
     # Create dataframe with most important information
 
     cols = ['Telephone Help', 'Service Paid By Customer']
@@ -143,8 +143,9 @@ def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, df_merged
     # Finding the optimal number of clusters using the Silhouette Score
     silhouette_scores = []
 
+    k_s = range(2, 5)
     # Finding the optimal number of clusters using the Silhouette Score and creating Silhouette Plots
-    for n_clusters in range(2, 21):
+    for n_clusters in k_s:
         fig, ax1 = plt.subplots(1, 1)
         fig.set_size_inches(18, 7)
 
@@ -157,6 +158,7 @@ def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, df_merged
 
         silhouette_avg = silhouette_score(features_pca, cluster_labels)
         print(f"For n_clusters = {n_clusters}, the average silhouette_score is : {silhouette_avg}")
+        silhouette_scores.append(silhouette_avg)
 
         sample_silhouette_values = silhouette_samples(features_pca, cluster_labels)
 
@@ -192,6 +194,13 @@ def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, df_merged
     optimal_k = np.argmax(silhouette_scores) + 2
     print(f'Optimal number of clusters: {optimal_k}')
 
+    plt.figure(figsize=(10, 6))
+    plt.plot(k_s, silhouette_scores, marker='o')
+    plt.xlabel('Number of clusters')
+    plt.ylabel('Silhouette Score')
+    plt.title('Silhouette Scores For Optimal k')
+    plt.savefig(output_path / 'silhouette_scores.png')
+
     # Define and fit the pipeline with the optimal number of clusters
     pipeline = Pipeline([
         ('scaler', MaxAbsScaler()),
@@ -204,3 +213,5 @@ def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, df_merged
 
     # Predict clusters
     data['Cluster'] = pipeline.predict(data)
+
+    data.to_csv(interim_path / 'clustered.csv', index=False)

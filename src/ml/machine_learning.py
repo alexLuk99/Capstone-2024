@@ -15,4 +15,4 @@ def machine_learning() -> None:
     # clustering(df_assistance=df_assistance)
 
     # categorisation
-    classification(df_assistance=df_assistance)
+    classification(df_assistance=df_assistance, df_workshop=df_workshop)

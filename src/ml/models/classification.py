@@ -10,9 +10,15 @@ import xgboost as xgb
 from sklearn.linear_model import LogisticRegression
 
 
-def classification(df_assistance: pd.DataFrame) -> None:
+def classification(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame) -> None:
     # 'VIN' als Index setzen
     df_assistance.set_index('VIN', inplace=True)
+
+    df_repairs = df_workshop.groupby(by='VIN')['Q-Line'].count()
+
+    # Rename der Spalte
+
+    df_assistance = df_assistance.merge(df_repairs, left_index=True, right_index=True, how='left')
 
     # Features und Labels trennen
     X = df_assistance[

@@ -5,5 +5,5 @@ runners = [
     'machine_learning',
 ]
 
-# Cluster Modell neu trainieren oder trainiertes Modell verwenden (Das erste Mal muss dieser Wert auf True gesetzt werden)
-train_cluster_model = True
+# Cluster Modell neu trainieren oder trainiertes Modell verwenden (Trainiertes Modell bereits in data/models abgespeichert)
+train_cluster_model = False

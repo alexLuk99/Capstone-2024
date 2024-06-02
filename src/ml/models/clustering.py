@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from loguru import logger
 from joblib import dump, load
 from config.paths import interim_path, output_path, models_path
+from src.ml.models.analyze_clusters import interpret_pca_loadings
 
 os.environ['LOKY_MAX_CPU_COUNT'] = str(os.cpu_count())
 
@@ -109,10 +110,6 @@ def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, train_mod
     pca = PCA(n_components=features_scaled.shape[1])
     pca.fit(features_scaled)
 
-    # Zurückgeben welche Spalten in PCA einfließen
-    numerical_features = data.columns.tolist()
-    loadings = pd.DataFrame(pca.components_.T, index=numerical_features)
-
     # Explained variance ratio
     explained_variance = pca.explained_variance_ratio_
     cumulative_variance = np.cumsum(explained_variance)
@@ -156,6 +153,17 @@ def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, train_mod
 
         # Transform the features
         features_pca = pipeline.fit_transform(data)
+
+        # Zurückgeben welche Spalten in PCA einfließen
+        numerical_features = data.columns.tolist()
+        loadings = pd.DataFrame(pipeline.steps[1][1].components_.T, index=numerical_features)
+
+        loading_cols = []
+        _ = [loading_cols.append(f'PC{x}') for x in loadings.columns ]
+
+        loadings.columns = loading_cols
+
+        interpret_pca_loadings(loadings=loadings)
 
         # Finding the optimal number of clusters using the Silhouette Score
         silhouette_scores = []

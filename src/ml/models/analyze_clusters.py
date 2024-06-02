@@ -168,7 +168,7 @@ def analyze_clusters():
 
     # Verteilung Component
     df_melted_component = pd.melt(df_clustered, id_vars=['VIN', 'Cluster'], value_vars=component_columns,
-                                     var_name='Component', value_name='Count')
+                                  var_name='Component', value_name='Count')
 
     df_melted_component = df_melted_component[df_melted_component['Count'] > 0]
     df_melted_component = df_melted_component.groupby(by=['Cluster', 'Component'], as_index=False)[
@@ -189,4 +189,42 @@ def analyze_clusters():
     dist_component.save(output_path / 'distribution_component.html')
 
 
-# Visualisierungen um Cluster zu analysieren
+def interpret_pca_loadings(loadings, top_n=5):
+    """
+    Interpret the PCA loadings by identifying the top N features contributing to each principal component.
+    """
+    n_components = loadings.shape[1]
+    visuals = []
+    for i in range(n_components):
+        component_name = f'PC{i}'
+
+        sorted_loadings = loadings[component_name].abs().sort_values(ascending=False)
+        top_features = sorted_loadings.head(top_n).index.tolist()
+
+        # for feature in top_features:
+        #     loading_value = loadings.loc[feature, component_name]
+        #     print(f'Feature: {feature}, Loading: {loading_value:.4f}')
+
+        # Create a DataFrame for Altair
+        top_loadings_df = loadings.loc[top_features, component_name].reset_index()
+        top_loadings_df.columns = ['Feature', 'Loading']
+
+        # Visualization with Altair
+        bar_chart = alt.Chart(top_loadings_df).mark_bar().encode(
+            x=alt.X('Loading:Q'),
+            y=alt.Y('Feature:N', sort='-x'),
+            color=alt.Color('Loading:Q', scale=alt.Scale(scheme='viridis'))
+        ).properties(
+            title=f'Top {top_n} Features Contributing to {component_name}',
+            width=600,
+            height=400
+        )
+
+        visuals.append(bar_chart)
+
+    chart = alt.vconcat(*visuals)
+
+    path = output_path / 'loadings'
+    # path = path.mkdir(exist_ok=True, parents=True)
+
+    chart.save(path / f'top_{top_n}_features.html')

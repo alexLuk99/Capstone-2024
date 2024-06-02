@@ -100,6 +100,9 @@ def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, train_mod
 
     # Set VIN as Index
     data = df_assistance_grouped.copy()
+    # Hier suspect hinzufügen
+    df_suspect = df_assistance[['VIN', 'Suspect']].drop_duplicates(subset='VIN')
+    data = data.merge(df_suspect, on='VIN', how='left')
     data = data.set_index('VIN')
 
     # Standardize the features
@@ -159,7 +162,7 @@ def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, train_mod
         loadings = pd.DataFrame(pipeline.steps[1][1].components_.T, index=numerical_features)
 
         loading_cols = []
-        _ = [loading_cols.append(f'PC{x}') for x in loadings.columns ]
+        _ = [loading_cols.append(f'PC{x}') for x in loadings.columns]
 
         loadings.columns = loading_cols
 

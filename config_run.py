@@ -1,7 +1,7 @@
 # Was soll ausgeführt werden?
 runners = [
-     #'data_preparation',
-     #'analysis',
+    # 'data_preparation',
+    # 'analysis',
     'machine_learning',
 ]
 

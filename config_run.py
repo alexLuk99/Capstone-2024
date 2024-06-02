@@ -6,4 +6,4 @@ runners = [
 ]
 
 # Cluster Modell neu trainieren oder trainiertes Modell verwenden (Trainiertes Modell bereits in data/models abgespeichert)
-train_model = True
+train_model = False

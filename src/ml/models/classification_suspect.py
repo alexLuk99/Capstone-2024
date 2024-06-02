@@ -18,17 +18,18 @@ def classification_suspect(data: pd.DataFrame, train_model: bool = False) -> Non
 
     data = data.copy()
 
-    # Total Services Offered, Rental Car Days, Anruferzahl ist Teil vom Sus-O-Meter -> kommt raus
-    data = data.drop(columns=['Total Services Offered', 'Anzahl_Anrufe', 'Rental_Car_Days'])
+    # Total Services Offered, Rental Car Days, Anruferzahl, Towing und Scheduled Towing ist Teil vom Sus-O-Meter -> kommt raus
+    data = data.drop(
+        columns=['Total Services Offered', 'Anzahl_Anrufe', 'Rental_Car_Days', 'Towing', 'Scheduled Towing'])
 
     X = data[['Durschnittliche_Zeit_zwischen_Towings', 'Telephone_Help', 'Service_Paid_By_Customer',
               'Registration Date Jahr', 'Modellreihe_Encoded', '(Other)', 'Cancelled',
               'Change of Tyre', 'Jump Start',
               'Rental Car without primary services (i.e. Towing and Roadsaide Assistance)', 'Roadside Repair Others',
-              'Scheduled Towing', 'Scheduled roadside repair', 'Towing', 'Air conditioning ',
-              'Anti Blocking System (ABS) ', 'Anti Theft Protection', 'Battery', 'Body-Equipment inside ',
-              'Brakes - Brake mechanics ', 'Brakes - Hydraulic brake system, regulator ', 'Clutch',
-              'Convertible top, hardtop ', 'Door, central locking system ', 'Engine - Cooling', 'Engine - General',
+              'Scheduled roadside repair', 'Air conditioning ', 'Anti Blocking System (ABS) ', 'Anti Theft Protection',
+              'Battery', 'Body-Equipment inside ', 'Brakes - Brake mechanics ',
+              'Brakes - Hydraulic brake system, regulator ', 'Clutch', 'Convertible top, hardtop ',
+              'Door, central locking system ', 'Engine - Cooling', 'Engine - General',
               'Engine - Lubrication', 'Exhaust system ', 'Final drive - Differential, differential lock ', 'Flat Tyre',
               'Fuel supply', 'Fuel system / Electronic ignition ', 'Generator', 'Glazing, window control ',
               'Ignition and preheating system ', 'Instruments ', 'Insufficient Fuel / Empty Fuel Tank',
@@ -49,8 +50,8 @@ def classification_suspect(data: pd.DataFrame, train_model: bool = False) -> Non
 
         # Hyperparameter-Raster
         param_grid = {
-            'classifier__n_estimators': [50, 100, 150],
-            'classifier__learning_rate': [0.01, 0.1, 0.2],
+            'classifier__n_estimators': [100, 150],
+            'classifier__learning_rate': [0.1, 0.2],
             'classifier__max_depth': [3, 5, 7],
             'classifier__subsample': [0.6, 0.8, 1.0],
             'classifier__colsample_bytree': [0.6, 0.8, 1.0]

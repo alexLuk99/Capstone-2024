@@ -15,7 +15,7 @@ def machine_learning() -> None:
     # classification with leads
 
     # clustering
-    clustering(df_assistance=df_assistance, df_workshop=df_workshop)
+    # clustering(df_assistance=df_assistance, df_workshop=df_workshop)
     analyze_clusters()
 
     # categorisation

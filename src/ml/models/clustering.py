@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from matplotlib import cm
@@ -17,9 +19,7 @@ os.environ['LOKY_MAX_CPU_COUNT'] = str(os.cpu_count())
 
 
 def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, train_model: bool = False) -> None:
-    kmeans_path = models_path / '/kmeans_model.joblib'
-
-    train_model = True
+    kmeans_path = Path(models_path / 'kmeans_model.joblib')
 
     # Create dataframe with most important information
     cols = ['Telephone Help', 'Service Paid By Customer']
@@ -239,5 +239,6 @@ def clustering(df_assistance: pd.DataFrame, df_workshop: pd.DataFrame, train_mod
 
     # Predict clusters
     data['Cluster'] = pipeline.predict(data)
+    data = data.reset_index()
 
     data.to_csv(interim_path / 'clustered.csv', index=False)

@@ -16,7 +16,7 @@ def machine_learning(train_cluster_model: bool) -> None:
 
     # clustering
     # clustering(df_assistance=df_assistance, df_workshop=df_workshop, train_model=train_cluster_model)
-    analyze_clusters()
+    # analyze_clusters()
 
     # categorisation
-    # classification(df_assistance=df_assistance, df_workshop=df_workshop)
+    classification(df_assistance=df_assistance, df_workshop=df_workshop, save_path='data/output')

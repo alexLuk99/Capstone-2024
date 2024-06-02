@@ -34,4 +34,4 @@ class Capstone:
         analyse_data()
 
     def machine_learning(self):
-        machine_learning(train_cluster_model=self.train_cluster_model)
+        machine_learning(train_model=self.train_cluster_model)

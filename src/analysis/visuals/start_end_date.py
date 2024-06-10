@@ -62,15 +62,15 @@ def policy_start_end_date(data: pd.DataFrame, output_path: Path) -> None:
     )
 
     # Create the scatter plot with regression line
-    scatter_chart = (
-        alt.Chart(df_filtered)
-        .mark_circle(size=60)
-        .encode(
-            x=alt.X("Days Until Policy End:Q", title="Days Until Policy End"),
-            y=alt.Y("count()", title="Number of Incidents"),
-            tooltip=["Days Until Policy End", "count()"],
-        )
-    )
+    # scatter_chart = (
+    #     alt.Chart(df_filtered)
+    #     .mark_circle(size=60)
+    #     .encode(
+    #         x=alt.X("Days Until Policy End:Q", title="Days Until Policy End"),
+    #         y=alt.Y("count()", title="Number of Incidents"),
+    #         tooltip=["Days Until Policy End", "count()"],
+    #     )
+    # )
 
     regression_line = (
         alt.Chart(regression_data)

@@ -8,7 +8,7 @@ from loguru import logger
 
 from sklearn.decomposition import PCA
 
-from config.paths import input_path, output_path, interim_path, models_path
+from config.paths import output_path, interim_path, models_path
 
 
 def remove_outliers(df, col):
@@ -23,6 +23,9 @@ def remove_outliers(df, col):
 def analyze_clusters():
     df_clustered = pd.read_csv(interim_path / 'clustered.csv')
     label_encoder_path = Path(models_path / 'label_encoders.joblib')
+
+    path_cluster_analysis = output_path / 'cluster_analysis'
+    path_cluster_analysis.mkdir(exist_ok=True, parents=True)
 
     # PCA für die Visualisierung
     pca = PCA(n_components=2)
@@ -46,7 +49,7 @@ def analyze_clusters():
     df_clustered = df_clustered.drop(columns=['PCA1', 'PCA2'])
 
     # Speichern des Plots
-    scatter_plot.save(output_path / 'cluster_visualization.html')
+    scatter_plot.save(path_cluster_analysis / 'cluster_visualization.html')
 
     # Boxplot für jede Clustergröße
     tmp_anrufe = df_clustered[['VIN', 'Cluster', 'Anzahl_Anrufe']]
@@ -62,7 +65,7 @@ def analyze_clusters():
     )
 
     # Speichern des Boxplots
-    boxplot.save(output_path / 'boxplot_cluster.html')
+    boxplot.save(path_cluster_analysis / 'boxplot_cluster.html')
 
     # Histogramm für 'Durschnittliche_Zeit_zwischen_Towings'
     tmp_towings = df_clustered[['VIN', 'Cluster', 'Durschnittliche_Zeit_zwischen_Towings']]
@@ -79,7 +82,7 @@ def analyze_clusters():
     )
 
     # Speichern des Histogramms
-    hist_towings.save(output_path / 'histogram_towings.html')
+    hist_towings.save(path_cluster_analysis / 'histogram_towings.html')
 
     # Scatter plot für 'Repairs' vs. 'Aufenthalte'
     tmp_repairs_vs_aufenthalte = df_clustered[['VIN', 'Cluster', 'Repairs', 'Aufenthalte']]
@@ -96,7 +99,7 @@ def analyze_clusters():
     )
 
     # Speichern des Scatterplots
-    scatter_repairs_vs_aufenthalte.save(output_path / 'scatter_repairs_vs_aufenthalte.html')
+    scatter_repairs_vs_aufenthalte.save(path_cluster_analysis / 'scatter_repairs_vs_aufenthalte.html')
 
     # Histogramm für 'Rental Car Days'
     tmp_rental_car_days = df_clustered[['VIN', 'Cluster', 'Rental_Car_Days']]
@@ -112,7 +115,7 @@ def analyze_clusters():
     )
 
     # Speichern des Histogramms
-    hist_rental_car_days.save(output_path / 'histogram_rental_car_days.html')
+    hist_rental_car_days.save(path_cluster_analysis / 'histogram_rental_car_days.html')
 
     # Load the label encoders
     label_encoder_modellreihe = load(label_encoder_path)
@@ -133,7 +136,7 @@ def analyze_clusters():
     )
 
     # Speichern des Verteilungsdiagramms für 'Modellreihe'
-    modellreihe_distribution.save(output_path / 'distribution_modellreihe.html')
+    modellreihe_distribution.save(path_cluster_analysis / 'distribution_modellreihe.html')
 
     # Liste der Spalten, die ge-melted werden sollen
     outcome_desc_columns = ['Cancelled', 'Change of Tyre', 'Jump Start',
@@ -178,7 +181,7 @@ def analyze_clusters():
         labelAngle=-45
     )
 
-    dist_outcome_desc.save(output_path / 'distribution_outcome_desc.html')
+    dist_outcome_desc.save(path_cluster_analysis / 'distribution_outcome_desc.html')
 
     # Verteilung Component
     df_melted_component = pd.melt(df_clustered, id_vars=['VIN', 'Cluster'], value_vars=component_columns,
@@ -200,7 +203,7 @@ def analyze_clusters():
         labelAngle=-45
     )
 
-    dist_component.save(output_path / 'distribution_component.html')
+    dist_component.save(path_cluster_analysis / 'distribution_component.html')
 
     # Cluster DataFrames erstellen
     clusters = df_clustered['Cluster'].unique()
@@ -259,14 +262,14 @@ def analyze_clusters():
         y='independent'
     )
 
-    chart.save('test.html')
+    # chart.save('test.html')
 
-    result_df.to_excel(output_path / 'Mittelwerte.xlsx')
+    result_df.to_excel(path_cluster_analysis / 'Mittelwerte.xlsx')
 
     numerical_columns = df_clustered.select_dtypes(include=['number']).columns.tolist()
 
 
-def interpret_pca_loadings(loadings, top_n=5):
+def interpret_pca_loadings(loadings, output_path: Path, top_n: str =5):
     """
     Interpret the PCA loadings by identifying the top N features contributing to each principal component.
     """
@@ -290,7 +293,11 @@ def interpret_pca_loadings(loadings, top_n=5):
         bar_chart = alt.Chart(top_loadings_df).mark_bar().encode(
             x=alt.X('Loading:Q'),
             y=alt.Y('Feature:N', sort='-x'),
-            color=alt.Color('Loading:Q', scale=alt.Scale(scheme='viridis'))
+            color=alt.Color('Loading:Q', scale=alt.Scale(scheme='viridis')),
+            tooltip=[
+            alt.Tooltip('Feature:N', title='Feature'),
+            alt.Tooltip('Loading:Q')
+        ]
         ).properties(
             title=f'Top {top_n} Features Contributing to {component_name}',
             width=600,
@@ -302,6 +309,6 @@ def interpret_pca_loadings(loadings, top_n=5):
     chart = alt.vconcat(*visuals)
 
     path = output_path / 'loadings'
-    # path = path.mkdir(exist_ok=True, parents=True)
+    path.mkdir(exist_ok=True, parents=True)
 
     chart.save(path / f'top_{top_n}_features.html')

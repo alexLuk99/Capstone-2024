@@ -1,9 +1,11 @@
+from pathlib import Path
+
 import pandas as pd
 from scipy.stats import chi2_contingency
 import altair as alt
 
 
-def perform_chi_square_test(data: pd.DataFrame, col1: str, col2: str) -> None:
+def perform_chi_square_test(data: pd.DataFrame, col1: str, col2: str, output_path: Path) -> None:
     """
     Performs a chi-squared test of independence between two categorical variables in a DataFrame.
 
@@ -42,11 +44,11 @@ def perform_chi_square_test(data: pd.DataFrame, col1: str, col2: str) -> None:
 
     counts = _get_count_chart(data=df, col1=col1, col2=col2)
     visualize_chi_square_test(data=result_df, col1=col1, col2=col2, chi2=chi2, p=p, significant=significant, dof=dof,
-                              counts=counts)
+                              counts=counts, output_path=output_path)
 
 
 def visualize_chi_square_test(data: pd.DataFrame, col1: str, col2: str, chi2: float, p: float, significant: bool,
-                              dof: int, counts: alt.Chart) -> None:
+                              dof: int, counts: alt.Chart, output_path: Path) -> None:
     """
     Takes measures calculated in perform_chi_square_test() and plots the chi-squared test results as a heatmap.
     :param data: Input DataFrame containing the categorical data, observed, expected, and residual frequencies.
@@ -68,7 +70,6 @@ def visualize_chi_square_test(data: pd.DataFrame, col1: str, col2: str, chi2: fl
             x=f'{col1}:O',
             y=f'{col2}:O',
             color=alt.Color(f'{column}:Q', scale=alt.Scale(scheme='blues')),
-            scale=alt.Scale(type='log'),
             tooltip=[f'{col1}', f'{col2}', f'{column}', f'{_tmp1}', f'{_tmp2}']
         ).properties(
             title={
@@ -86,7 +87,10 @@ def visualize_chi_square_test(data: pd.DataFrame, col1: str, col2: str, chi2: fl
         alt.hconcat(charts[1], charts[2]),
     )
 
-    chart.save(f'output/{col1}_{col2}_{column}.html')
+    chi_square_path = output_path / 'chi-square'
+    chi_square_path.mkdir(exist_ok=True, parents=True)
+
+    chart.save(chi_square_path / f'{col1}_{col2}_{column}.html')
 
 
 def _get_count_chart(data: pd.DataFrame, col1: str, col2: str) -> alt.Chart:
@@ -102,7 +106,6 @@ def _get_count_chart(data: pd.DataFrame, col1: str, col2: str) -> alt.Chart:
         x=alt.X(f'{col1}:N', title=f'{col1}'),
         y=alt.Y(f'{col2}:N', title=f'{col2}'),
         color=alt.Color(f'count:Q', title=f'Anzahl'),
-        scale=alt.Scale(type='log'),
         tooltip=[
             alt.Tooltip(title=f'{col1}', field=f'{col1}'),
             alt.Tooltip(title=f'{col2}', field=f'{col2}'),

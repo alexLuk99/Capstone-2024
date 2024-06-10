@@ -21,7 +21,10 @@ def counts_barchart(data: pd.DataFrame, col: str, output_path: Path) -> None:
         height=400
     )
 
-    chart.save(output_path / f'{col}_count.html')
+    bar_path = output_path / 'bar_charts'
+    bar_path.mkdir(exist_ok=True, parents=True)
+
+    chart.save(bar_path / f'{col}_count.html')
 
 
 def counts_barchart_log(data: pd.DataFrame, col: str, output_path: Path) -> None:
@@ -36,7 +39,10 @@ def counts_barchart_log(data: pd.DataFrame, col: str, output_path: Path) -> None
         title=f'Verteilung der Spalte {col} (logarithmische Skala)'
     )
 
-    chart.save(output_path / f'{col}_count_log.html')
+    bar_path = output_path / 'bar_charts'
+    bar_path.mkdir(exist_ok=True, parents=True)
+
+    chart.save(bar_path / f'{col}_count_log.html')
 
 
 def normalized_barchart_log(data: pd.DataFrame, col: str, output_path: Path) -> alt.Chart:
@@ -74,11 +80,14 @@ def normalized_barchart_log(data: pd.DataFrame, col: str, output_path: Path) -> 
         title=f'{col} Frequency Distribution with Normal Curve (Log Scale)'
     )
 
+    bar_path = output_path / 'bar_charts'
+    bar_path.mkdir(exist_ok=True, parents=True)
+
     # Speichern der Visualisierung als HTML
-    combined_chart.save(output_path / f'{col}_frequency_normal_distribution_log.html')
+    combined_chart.save(bar_path / f'{col}_frequency_normal_distribution_log.html')
 
     # Ausgabe der Häufigkeiten als CSV
-    counts.to_csv(output_path / f'{col}_frequency_counts.csv', index=False)
+    counts.to_csv(bar_path / f'{col}_frequency_counts.csv', index=False)
 
     # print(counts['Frequency'].describe())
 
@@ -97,4 +106,7 @@ def counts_barchart_color(data: pd.DataFrame, col: str, color: str, output_path:
         ]
     )
 
-    chart.save(output_path / f'{col}_{color}_chart.html')
+    bar_path = output_path / 'bar_charts'
+    bar_path.mkdir(exist_ok=True, parents=True)
+
+    chart.save(bar_path / f'{col}_{color}_chart.html')

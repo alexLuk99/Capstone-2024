@@ -1,4 +1,3 @@
-from pathlib import Path
 import pandas as pd
 import altair as alt
 
@@ -12,88 +11,68 @@ from src.analysis.visuals.most_common_word import most_common_word
 from src.analysis.visuals.start_end_date import policy_start_end_date
 from src.analysis.visuals.timeline import get_timeline
 
+from config.paths import output_path
+
 
 def analyse_data() -> None:
     # CSV-Datei einlesen
     df_assistance = pd.read_csv('data/interim/assistance.csv', low_memory=False)
     df_assistance = df_assistance.convert_dtypes()
 
-    # Create output dir
-    output_path = Path('output')
-    output_path.mkdir(exist_ok=True, parents=True)
+    output_path_analysis = output_path / 'analysis'
+    output_path_analysis.mkdir(exist_ok=True, parents=True)
 
     # Difference between policy start/end date with first assistance call
-    policy_start_end_date(data=df_assistance, output_path=output_path)
+    policy_start_end_date(data=df_assistance, output_path=output_path_analysis)
 
     # Erstellen von Barcharts
-    counts_barchart(data=df_assistance, col='Country Of Origin', output_path=output_path)
-    counts_barchart(data=df_assistance, col='Outcome Description', output_path=output_path)
-    counts_barchart(data=df_assistance, col='Component', output_path=output_path)
-    counts_barchart(data=df_assistance, col='Typ aus VIN', output_path=output_path)
+    counts_barchart(data=df_assistance, col='Country Of Origin', output_path=output_path_analysis)
+    counts_barchart(data=df_assistance, col='Outcome Description', output_path=output_path_analysis)
+    counts_barchart(data=df_assistance, col='Component', output_path=output_path_analysis)
+    counts_barchart(data=df_assistance, col='Reason Of Call', output_path=output_path_analysis)
+
+    # counts_barchart(data=df_assistance, col='Typ aus VIN', output_path=output_path_analysis)
     # counts_barchart(data=df_assistance, col='VIN', output_path=output_path)
 
     # Erstellen von Barcharts mit Farbe
-    counts_barchart_color(data=df_assistance, col='Model Year', color='Typ aus VIN', output_path=output_path)
-    counts_barchart_color(data=df_assistance, col='Component', color='Outcome Description', output_path=output_path)
-    counts_barchart_color(data=df_assistance, col='Model Year', color='Typ aus VIN', output_path=output_path)
+    # counts_barchart_color(data=df_assistance, col='Model Year', color='Typ aus VIN', output_path=output_path_analysis)
+    counts_barchart_color(data=df_assistance, col='Component', color='Outcome Description', output_path=output_path_analysis)
+    # counts_barchart_color(data=df_assistance, col='Model Year', color='Typ aus VIN', output_path=output_path_analysis)
 
     # Extrahiere die gebräuchigsten Wörter aus der Spalter "Fault Description Customer"
-    most_common_word(data=df_assistance, output_path=output_path)
+    # most_common_word(data=df_assistance, output_path=output_path_analysis)
 
     # Barchart mit normalisierte Spalte
-    normalized_barchart_log(data=df_assistance, col='VIN', output_path=output_path)
+    normalized_barchart_log(data=df_assistance, col='VIN', output_path=output_path_analysis)
 
     # Kreuztabelle erstellen und sortieren
-    crosstab_heatmap(data=df_assistance, col1='Component', col2='Outcome Description', output_path=output_path)
+    crosstab_heatmap(data=df_assistance, col1='Component', col2='Outcome Description', output_path=output_path_analysis)
 
     # Odometer
-    counts_barchart_log(data=df_assistance, col='Odometer', output_path=output_path)
+    counts_barchart_log(data=df_assistance, col='Odometer', output_path=output_path_analysis)
 
     # Abhängigkeit zwischen Component, Outcome und Services darstellen
-    component_outcome_services(data=df_assistance, output_path=output_path)
+    component_outcome_services(data=df_assistance, output_path=output_path_analysis)
 
     # Erstellen von Maps
-    create_country_choropleth(df=df_assistance, column='Country Of Origin', title='Number of permits')
-    create_country_choropleth(df=df_assistance, column='Country Of Incident', title='Number of incidents')
+    create_country_choropleth(df=df_assistance, column='Country Of Origin', output_path=output_path_analysis)
+    create_country_choropleth(df=df_assistance, column='Country Of Incident', output_path=output_path_analysis)
 
     # Chi Quadrat tests auf nominalen Attributen
-    perform_chi_square_test(data=df_assistance, col1='Component', col2='Outcome Description')
-    perform_chi_square_test(data=df_assistance, col1='Component', col2='Reason Of Call')
-    perform_chi_square_test(data=df_assistance, col1='Outcome Description', col2='Reason Of Call')
-    perform_chi_square_test(data=df_assistance, col1='Report Type', col2='Component')
-    perform_chi_square_test(data=df_assistance, col1='Report Type', col2='Outcome Description')
-    perform_chi_square_test(data=df_assistance, col1='Report Type', col2='Reason Of Call')
+    perform_chi_square_test(data=df_assistance, col1='Component', col2='Outcome Description', output_path=output_path_analysis)
+    perform_chi_square_test(data=df_assistance, col1='Component', col2='Reason Of Call', output_path=output_path_analysis)
+    perform_chi_square_test(data=df_assistance, col1='Outcome Description', col2='Reason Of Call', output_path=output_path_analysis)
+    perform_chi_square_test(data=df_assistance, col1='Report Type', col2='Component', output_path=output_path_analysis)
+    perform_chi_square_test(data=df_assistance, col1='Report Type', col2='Outcome Description', output_path=output_path_analysis)
+    perform_chi_square_test(data=df_assistance, col1='Report Type', col2='Reason Of Call', output_path=output_path_analysis)
 
-    get_timeline(data=df_assistance, col='Incident Date', aggregate='Monat')
-
-
-    # Remove rows where 'Reason Of Call' is empty
-    df_assistance = df_assistance.dropna(subset=['Reason Of Call'])
-
-    # Count frequency of each category in 'Reason Of Call'
-    value_counts = df_assistance['Reason Of Call'].value_counts().reset_index()
-    value_counts.columns = ['Reason Of Call', 'Frequency']
-
-    # Create a logarithmic bar chart with Altair
-    bar_chart = alt.Chart(value_counts).mark_bar().encode(
-        x=alt.X('Frequency:Q', title='Frequency', scale=alt.Scale(type='log')),
-        y=alt.Y('Reason Of Call:N', sort='-x', title='Reason Of Call'),
-        tooltip=['Reason Of Call', 'Frequency']
-    ).properties(
-        title='Frequency of Categories in "Reason Of Call"',
-        width=800,
-        height=400
-    )
-
-    # Save the diagram
-    bar_chart.save(output_path / 'reason_of_call_frequency_logarithmic.html')
+    get_timeline(data=df_assistance, col='Incident Date', aggregate='Monat', output_path=output_path_analysis)
 
     # Heatmep Bolean
     # List of columns of interest
     columns_of_interest = [
         'Hotel Service', 'Alternative Transport', 'Taxi Service', 'Vehicle Transport',
-        'Car Key Service', 'Parts Service', 'Personal Services', 'Damage During Assistance',
-        'Additional Services Not Covered'
+        'Car Key Service', 'Parts Service', 'Damage During Assistance',        'Additional Services Not Covered'
     ]
 
     # Ensure all columns are present in the dataframe
@@ -106,7 +85,8 @@ def analyse_data() -> None:
     print(f"Deleted {deleted_row_count} rows with missing values")
 
     # Convert boolean values to binary
-    df_binary = df_selected.applymap(lambda x: 1 if x == 'YES' else 0)
+    df_binary = df_selected.copy()
+    df_binary['Damage During Assistance'] = df_binary['Damage During Assistance'].map({'YES': True, 'NO': False})
 
     # Calculate the correlation matrix
     correlation_matrix = df_binary.corr()
@@ -128,29 +108,29 @@ def analyse_data() -> None:
     )
 
     # Save the heatmap
-    heatmap.save(output_path / 'correlation_heatmap.html')
+    heatmap.save(output_path_analysis / 'correlation_heatmap.html')
 
-    #  replacement cars distribution
-    # Ensure the "Replacement Car Days" column is numeric and drop NaN values
-    df_assistance['Replacement Car Days'] = pd.to_numeric(df_assistance['Replacement Car Days'], errors='coerce')
-    df_assistance = df_assistance.dropna(subset=['Replacement Car Days'])
+    #  Rental cars distribution
+    # Ensure the "Rental Car Days" column is numeric and drop NaN values
+    df_assistance['Rental Car Days'] = pd.to_numeric(df_assistance['Rental Car Days'], errors='coerce')
+    df_assistance = df_assistance.dropna(subset=['Rental Car Days'])
 
     # Calculate statistics
     stats = {
-        'Mean': df_assistance['Replacement Car Days'].mean(),
-        'Median': df_assistance['Replacement Car Days'].median(),
-        'Q0.1': df_assistance['Replacement Car Days'].quantile(0.1),
-        'Q0.9': df_assistance['Replacement Car Days'].quantile(0.9)
+        'Mean': df_assistance['Rental Car Days'].mean(),
+        'Median': df_assistance['Rental Car Days'].median(),
+        'Q0.1': df_assistance['Rental Car Days'].quantile(0.1),
+        'Q0.9': df_assistance['Rental Car Days'].quantile(0.9)
     }
 
     # Create histogram with hover details and logarithmic scale
     hist = alt.Chart(df_assistance).mark_bar().encode(
-        alt.X('Replacement Car Days:Q', bin=alt.Bin(maxbins=20), title='Replacement Car Days'),
+        alt.X('Rental Car Days:Q', bin=alt.Bin(maxbins=20), title='Rental Car Days'),
         alt.Y('count()', title='Frequency', scale=alt.Scale(type='log')),
-        tooltip=[alt.Tooltip('Replacement Car Days:Q', bin=True, title='Replacement Car Days'),
+        tooltip=[alt.Tooltip('Rental Car Days:Q', bin=True, title='Rental Car Days'),
                  alt.Tooltip('count()', title='Frequency')]
     ).properties(
-        title='Histogram of Replacement Car Days with Statistical Indicators',
+        title='Histogram of Rental Car Days with Statistical Indicators',
         width=800,
         height=400
     ).interactive()
@@ -171,10 +151,4 @@ def analyse_data() -> None:
     chart = hist + rules
 
     # Save the chart
-    chart.save(output_path / 'replacement_car_days_distribution.html')
-
-
-    ### WORKSHOP ANALYSYS ###
-    df_workshop = pd.read_csv('data/interim/workshop.csv')
-
-    pass
+    chart.save(output_path_analysis / 'Rental_car_days_distribution.html')

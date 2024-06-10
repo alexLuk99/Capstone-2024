@@ -20,7 +20,7 @@ def machine_learning(train_model: bool) -> None:
     # clustering(data=data, train_model=train_model)
     # analyze_clusters()
 
-    classification_suspect(data=data_suspect, train_model=train_model)
+    # classification_suspect(data=data_suspect, train_model=train_model)
 
     # categorisation
-    classification(df_assistance=df_assistance, df_workshop=df_workshop, save_path='data/output')
+    classification(df_assistance=df_assistance, df_workshop=df_workshop, train_model=train_model)

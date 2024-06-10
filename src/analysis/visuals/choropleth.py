@@ -1,8 +1,11 @@
+from pathlib import Path
+
 import pandas as pd
 import altair as alt
 import requests
 
-def create_country_choropleth(df: pd.DataFrame, column: str, title: str) -> None:
+
+def create_country_choropleth(df: pd.DataFrame, column: str, output_path: Path) -> None:
     # Load GeoJSON data for Europe
     url = 'https://raw.githubusercontent.com/leakyMirror/map-of-europe/master/GeoJSON/europe.geojson'
     response = requests.get(url)
@@ -14,14 +17,14 @@ def create_country_choropleth(df: pd.DataFrame, column: str, title: str) -> None
     # Count the number of country occurences
     country_counts.columns = ['Country', 'Count']
 
-    # ToDo: This in preprocessing
     country_codes = pd.read_csv('utils/mapping/country_codes.csv')
     country_codes = dict(zip(country_codes['Alpha-2 Code'], country_codes['Country Name']))
     # Add full country names to the country_counts DataFrame
     country_counts['Country Name'] = country_counts['Country'].map(country_codes, na_action='ignore')
 
     choropleth = alt.Chart(alt.Data(values=europe_geojson['features'])).mark_geoshape(stroke='white').encode(
-        color=alt.Color('Count:Q', scale=alt.Scale(scheme='tealblues', type='log'), legend=alt.Legend(title='Number of VINs')),
+        color=alt.Color('Count:Q', scale=alt.Scale(scheme='tealblues', type='log'),
+                        legend=alt.Legend(title='Number of VINs')),
         tooltip=[
             alt.Tooltip('properties.NAME:N', title='Country'),
             alt.Tooltip('Count:Q', title='Number of IDs')
@@ -37,4 +40,7 @@ def create_country_choropleth(df: pd.DataFrame, column: str, title: str) -> None
         type='mercator'
     )
 
-    choropleth.save(f'output/europe_choropleth_{column}.html')
+    maps_path = output_path / 'maps'
+    maps_path.mkdir(exist_ok=True, parents=True)
+
+    choropleth.save(maps_path / f'europe_choropleth_{column}.html')

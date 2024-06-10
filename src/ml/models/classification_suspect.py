@@ -89,6 +89,9 @@ def classification_suspect(data: pd.DataFrame, train_model: bool = False) -> Non
     fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
     roc_auc = auc(fpr, tpr)
 
+    classification_suspect_path = output_path / 'classification_suspect'
+    classification_suspect_path.mkdir(exist_ok=True, parents=True)
+
     # ROC-Kurve plotten und speichern
     plt.figure()
     plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % roc_auc)
@@ -99,7 +102,7 @@ def classification_suspect(data: pd.DataFrame, train_model: bool = False) -> Non
     plt.ylabel('True Positive Rate')
     plt.title('Receiver Operating Characteristic (ROC)')
     plt.legend(loc="lower right")
-    plt.savefig(output_path / 'classification_suspect.png')
+    plt.savefig(classification_suspect_path / 'classification_suspect_roc.png')
     plt.show()
 
     classifier = model.named_steps['classifier']

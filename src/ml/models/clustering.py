@@ -83,7 +83,7 @@ def clustering(data: pd.DataFrame, train_model: bool = False):
 
         loadings.columns = loading_cols
 
-        interpret_pca_loadings(loadings=loadings)
+        interpret_pca_loadings(loadings=loadings, output_path=output_path)
 
         # Finding the optimal number of clusters using the Silhouette Score
         silhouette_scores = []

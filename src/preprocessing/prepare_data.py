@@ -18,7 +18,7 @@ def format_time(time_str):
     return pd.NA
 
 
-def read_prepare_data() -> pd.DataFrame:
+def read_prepare_data() -> None:
     # Read and prepare assistance file
     # column Monat and License Plate are missing in sheet 2023
     # some other columns are named differently in different sheets -> consistent/uniform naming
@@ -81,7 +81,6 @@ def read_prepare_data() -> pd.DataFrame:
         df_assistance[column] = registration_date_1.fillna(registration_date_2)
 
     # Bereinigung der "Registration Date" Spalte: Ab 1948 bis 2023
-
     df_assistance.loc[
         (df_assistance['Registration Date'].dt.year < 1948) | (df_assistance['Registration Date'].dt.year > 2023),
         'Registration Date'] = pd.NaT
@@ -149,7 +148,6 @@ def read_prepare_data() -> pd.DataFrame:
     df_assistance = df_assistance.rename(columns={'Replacement Car Days': 'Rental Car Days'})
 
     # Policy Duration
-    # ToDo: Alle Daten mit Policy Start Date vor Gründung von Porsche Assistance mit pd.NaT ersetzen
     # Porsche Assistance has a maximum duration of 3 years, so all Policy End Dates which are greater than 01.01.2027 are unrealistic
     df_assistance.loc[df_assistance['Policy Start Date'] < pd.to_datetime('2002-01-01',
                                                                           format='%Y-%m-%d'), 'Policy Start Date'] = pd.NaT

@@ -232,7 +232,7 @@ def analyze_clusters():
         mean_results.append(results[c].get('Numerical Means'))
 
     mean_result_df = pd.concat(mean_results, axis=1).reset_index(names='Feature')
-    mean_result_df = mean_result_df.melt(value_vars=[0, 1, 2], var_name='Cluster', value_name='Mean',
+    mean_result_df = mean_result_df.melt(value_vars=mean_result_df.columns, var_name='Cluster', value_name='Mean',
                                          id_vars=['Feature'])
 
     median_results = []
@@ -240,7 +240,7 @@ def analyze_clusters():
         median_results.append(results[c].get('Numerical Medians'))
 
     median_result_df = pd.concat(median_results, axis=1).reset_index(names='Feature')
-    median_result_df = median_result_df.melt(value_vars=[0, 1, 2], var_name='Cluster', value_name='Median',
+    median_result_df = median_result_df.melt(value_vars=median_result_df.columns, var_name='Cluster', value_name='Median',
                                              id_vars=['Feature'])
 
     result_df = mean_result_df.merge(median_result_df, on=['Feature', 'Cluster'], how='left')

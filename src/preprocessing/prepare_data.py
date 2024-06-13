@@ -18,7 +18,7 @@ def format_time(time_str):
     return pd.NA
 
 
-def read_prepare_data() -> pd.DataFrame:
+def read_prepare_data() -> None:
     # Read and prepare assistance file
     # column Monat and License Plate are missing in sheet 2023
     # some other columns are named differently in different sheets -> consistent/uniform naming
@@ -81,7 +81,6 @@ def read_prepare_data() -> pd.DataFrame:
         df_assistance[column] = registration_date_1.fillna(registration_date_2)
 
     # Bereinigung der "Registration Date" Spalte: Ab 1948 bis 2023
-
     df_assistance.loc[
         (df_assistance['Registration Date'].dt.year < 1948) | (df_assistance['Registration Date'].dt.year > 2023),
         'Registration Date'] = pd.NaT
@@ -154,7 +153,6 @@ def read_prepare_data() -> pd.DataFrame:
     df_assistance = df_assistance.rename(columns={'Replacement Car Days': 'Rental Car Days'})
 
     # Policy Duration
-    # ToDo: Alle Daten mit Policy Start Date vor Gründung von Porsche Assistance mit pd.NaT ersetzen
     # Porsche Assistance has a maximum duration of 3 years, so all Policy End Dates which are greater than 01.01.2027 are unrealistic
     df_assistance.loc[df_assistance['Policy Start Date'] < pd.to_datetime('2002-01-01',
                                                                           format='%Y-%m-%d'), 'Policy Start Date'] = pd.NaT
@@ -347,70 +345,6 @@ def read_prepare_data() -> pd.DataFrame:
     # Füge die neue Spalte SuS_Abschleppungen hinzu
     df_assistance['SuS_Abschleppungen'] = df_assistance['VIN'].apply(lambda vin: vin in top_vins_towing)
 
-    sus_columns = ['SuS_Anruferzahl', 'SuS_Vertragszeitraum', 'SuS_Services_Offered', 'SuS_AnrufeInFall',
-                   'SuS_Rental_Car', 'SuS_Breakdown', 'SuS_Abschleppungen']
-
-    df_assistance['SuS-O-Meter'] = df_assistance[sus_columns].sum(axis=1) / len(sus_columns)
-
-    df = pd.DataFrame(df_assistance['SuS-O-Meter'])
-    mean = df['SuS-O-Meter'].mean()
-    std = df['SuS-O-Meter'].std()
-    df['SuS-O-Meter-Standardized'] = (df['SuS-O-Meter'] - mean) / std
-
-    chart = alt.Chart(df).mark_bar().encode(
-        alt.X('SuS-O-Meter:Q', bin=True, title='SuS-O-Meter'),
-        alt.Y('count()', title='Anzahl')
-    ).properties(
-        title='Verteilung des SuS-O-Meters'
-    )
-
-    chart_stand = alt.Chart(df).mark_bar().encode(
-        alt.X('SuS-O-Meter-Standardized:Q', bin=True, title='Normalisierte SuS-O-Meter'),
-        alt.Y('count()', title='Anzahl')
-    ).properties(
-        title='Verteilung des standardisierten SuS-O-Meters'
-    )
-
-    box = alt.Chart(df).mark_boxplot().encode(
-        y='SuS-O-Meter:Q'
-    ).properties(
-        title='Boxplot des SuS-O-Meters'
-    )
-
-    chart.save(output_path / 'susometer.html')
-    chart_stand.save(output_path / 'susometer_stand.html')
-    box.save(output_path / 'susometer_box.html')
-
-    #%%
-
-    # Berechnung der statistischen Werte und Quantile
-    stats_df = df_assistance['SuS-O-Meter'].describe(percentiles=[0.25, 0.5, 0.75, 0.9, 0.95, 0.99])
-
-    # Ausgabe der statistischen Werte
-    print(stats_df)
-
-    # Speicherung der statistischen Werte in eine Datei
-    stats_df.to_csv(output_path / 'susometer_stats.csv')
-
-#%%
-
-    # Berechnung des obersten Quantils (z.B. 0.x Quantil)
-    upper_quantile = df_assistance['SuS-O-Meter'].quantile(0.90)
-
-    # Hinzufügen der neuen Spalte
-    df_assistance['Suspect'] = df_assistance['SuS-O-Meter'] >= upper_quantile
-
-    suspect_counts = df_assistance['Suspect'].value_counts()
-
-    # Ausgabe der Häufigkeit
-    print(suspect_counts)
-
-    #%%
-
-
-    # Erstellen des Zwischenpfads und Speichern der Datei
-    interim_path.mkdir(parents=True, exist_ok=True)
-
     logger.info('Prepare assistance report ... done')
     logger.info('Prepare workshop file ...')
 
@@ -579,6 +513,50 @@ def read_prepare_data() -> pd.DataFrame:
     # Aktualisieren der 'Merged'-Spalte basierend auf der Existenz in merged_df
     df_assistance['Merged'] = df_assistance['Case Number'].isin(merged_ids)
 
+    df_assistance['SuS_Merged'] = False
+    df_assistance.loc[((df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])) & (
+                df_assistance['Merged'] == False)), 'SuS_Merged'] = True
+
+    sus_columns = ['SuS_Anruferzahl', 'SuS_Vertragszeitraum', 'SuS_Services_Offered', 'SuS_AnrufeInFall',
+                   'SuS_Rental_Car', 'SuS_Breakdown', 'SuS_Abschleppungen', 'SuS_Merged']
+
+    df_assistance['SuS-O-Meter'] = df_assistance[sus_columns].sum(axis=1) / len(sus_columns)
+
+    df = pd.DataFrame(df_assistance['SuS-O-Meter'])
+    mean = df['SuS-O-Meter'].mean()
+    std = df['SuS-O-Meter'].std()
+    df['SuS-O-Meter-Standardized'] = (df['SuS-O-Meter'] - mean) / std
+
+    chart = alt.Chart(df).mark_bar().encode(
+        alt.X('SuS-O-Meter:Q', bin=True, title='SuS-O-Meter'),
+        alt.Y('count()', title='Anzahl')
+    ).properties(
+        title='Verteilung des SuS-O-Meters'
+    )
+
+    chart_stand = alt.Chart(df).mark_bar().encode(
+        alt.X('SuS-O-Meter-Standardized:Q', bin=True, title='Normalisierte SuS-O-Meter'),
+        alt.Y('count()', title='Anzahl')
+    ).properties(
+        title='Verteilung des standardisierten SuS-O-Meters'
+    )
+
+    box = alt.Chart(df).mark_boxplot().encode(
+        y='SuS-O-Meter:Q'
+    ).properties(
+        title='Boxplot des SuS-O-Meters'
+    )
+
+    chart.save(output_path / 'susometer.html')
+    chart_stand.save(output_path / 'susometer_stand.html')
+    box.save(output_path / 'susometer_box.html')
+
+    # Berechnung des obersten Quantils (z.B. 0.x Quantil)
+    upper_quantile = df_assistance['SuS-O-Meter'].quantile(0.90)
+
+    # Hinzufügen der neuen Spalte
+    df_assistance['Suspect'] = df_assistance['SuS-O-Meter'] >= upper_quantile
+
     df_assistance = df_assistance.convert_dtypes()
     df_assistance.to_csv(interim_path / 'assistance.csv', index=False)
 
@@ -612,10 +590,3 @@ def read_prepare_data() -> pd.DataFrame:
 
     # Speichern der aktualisierten workshop.csv
     df_workshop.to_csv('data/interim/workshop.csv', index=False)
-
-    # Anzahl der Einträge in unmerged_fall_ids_df ausgeben
-    num_unmerged_entries = len(unmerged_fall_ids_df)
-    print(f"Anzahl der Einträge in unmerged_fall_ids_df: {num_unmerged_entries}")
-
-    # ToDo
-    # Überpürfen ob Reparaturdaten bei Werkstattaufenthalten identisch sind (Marcs Idee)

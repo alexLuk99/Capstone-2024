@@ -1,10 +1,11 @@
+from pathlib import Path
 from typing import Literal
 
 import pandas as pd
 import altair as alt
 
 
-def get_timeline(data: pd.DataFrame, col: str, aggregate: Literal['Monat', 'Quartal', 'Quartal_Monat']) -> None:
+def get_timeline(data: pd.DataFrame, col: str, aggregate: Literal['Monat', 'Quartal', 'Quartal_Monat'], output_path: Path) -> None:
     """
     Get a timeline of data
     :param data: The input DataFrame containing the Date data.
@@ -33,4 +34,7 @@ def get_timeline(data: pd.DataFrame, col: str, aggregate: Literal['Monat', 'Quar
         title=f'{col} Count Over Time'
     )
 
-    chart.save(f'output/{col}_Count_{agg}.html')
+    time_path = output_path / 'timeseries'
+    time_path.mkdir(exist_ok=True, parents=True)
+
+    chart.save(time_path / f'{col}_Count_{agg}.html')

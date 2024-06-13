@@ -331,46 +331,6 @@ def read_prepare_data() -> None:
     # Füge die neue Spalte SuS_Abschleppungen hinzu
     df_assistance['SuS_Abschleppungen'] = df_assistance['VIN'].apply(lambda vin: vin in top_vins_towing)
 
-    sus_columns = ['SuS_Anruferzahl', 'SuS_Vertragszeitraum', 'SuS_Services_Offered', 'SuS_AnrufeInFall',
-                   'SuS_Rental_Car', 'SuS_Breakdown', 'SuS_Abschleppungen']
-
-    df_assistance['SuS-O-Meter'] = df_assistance[sus_columns].sum(axis=1) / len(sus_columns)
-
-    df = pd.DataFrame(df_assistance['SuS-O-Meter'])
-    mean = df['SuS-O-Meter'].mean()
-    std = df['SuS-O-Meter'].std()
-    df['SuS-O-Meter-Standardized'] = (df['SuS-O-Meter'] - mean) / std
-
-    chart = alt.Chart(df).mark_bar().encode(
-        alt.X('SuS-O-Meter:Q', bin=True, title='SuS-O-Meter'),
-        alt.Y('count()', title='Anzahl')
-    ).properties(
-        title='Verteilung des SuS-O-Meters'
-    )
-
-    chart_stand = alt.Chart(df).mark_bar().encode(
-        alt.X('SuS-O-Meter-Standardized:Q', bin=True, title='Normalisierte SuS-O-Meter'),
-        alt.Y('count()', title='Anzahl')
-    ).properties(
-        title='Verteilung des standardisierten SuS-O-Meters'
-    )
-
-    box = alt.Chart(df).mark_boxplot().encode(
-        y='SuS-O-Meter:Q'
-    ).properties(
-        title='Boxplot des SuS-O-Meters'
-    )
-
-    chart.save(output_path / 'susometer.html')
-    chart_stand.save(output_path / 'susometer_stand.html')
-    box.save(output_path / 'susometer_box.html')
-
-    # Berechnung des obersten Quantils (z.B. 0.x Quantil)
-    upper_quantile = df_assistance['SuS-O-Meter'].quantile(0.90)
-
-    # Hinzufügen der neuen Spalte
-    df_assistance['Suspect'] = df_assistance['SuS-O-Meter'] >= upper_quantile
-
     logger.info('Prepare assistance report ... done')
     logger.info('Prepare workshop file ...')
 
@@ -538,6 +498,50 @@ def read_prepare_data() -> None:
 
     # Aktualisieren der 'Merged'-Spalte basierend auf der Existenz in merged_df
     df_assistance['Merged'] = df_assistance['Case Number'].isin(merged_ids)
+
+    df_assistance['SuS_Merged'] = False
+    df_assistance.loc[((df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])) & (
+                df_assistance['Merged'] == False)), 'SuS_Merged'] = True
+
+    sus_columns = ['SuS_Anruferzahl', 'SuS_Vertragszeitraum', 'SuS_Services_Offered', 'SuS_AnrufeInFall',
+                   'SuS_Rental_Car', 'SuS_Breakdown', 'SuS_Abschleppungen', 'SuS_Merged']
+
+    df_assistance['SuS-O-Meter'] = df_assistance[sus_columns].sum(axis=1) / len(sus_columns)
+
+    df = pd.DataFrame(df_assistance['SuS-O-Meter'])
+    mean = df['SuS-O-Meter'].mean()
+    std = df['SuS-O-Meter'].std()
+    df['SuS-O-Meter-Standardized'] = (df['SuS-O-Meter'] - mean) / std
+
+    chart = alt.Chart(df).mark_bar().encode(
+        alt.X('SuS-O-Meter:Q', bin=True, title='SuS-O-Meter'),
+        alt.Y('count()', title='Anzahl')
+    ).properties(
+        title='Verteilung des SuS-O-Meters'
+    )
+
+    chart_stand = alt.Chart(df).mark_bar().encode(
+        alt.X('SuS-O-Meter-Standardized:Q', bin=True, title='Normalisierte SuS-O-Meter'),
+        alt.Y('count()', title='Anzahl')
+    ).properties(
+        title='Verteilung des standardisierten SuS-O-Meters'
+    )
+
+    box = alt.Chart(df).mark_boxplot().encode(
+        y='SuS-O-Meter:Q'
+    ).properties(
+        title='Boxplot des SuS-O-Meters'
+    )
+
+    chart.save(output_path / 'susometer.html')
+    chart_stand.save(output_path / 'susometer_stand.html')
+    box.save(output_path / 'susometer_box.html')
+
+    # Berechnung des obersten Quantils (z.B. 0.x Quantil)
+    upper_quantile = df_assistance['SuS-O-Meter'].quantile(0.90)
+
+    # Hinzufügen der neuen Spalte
+    df_assistance['Suspect'] = df_assistance['SuS-O-Meter'] >= upper_quantile
 
     df_assistance = df_assistance.convert_dtypes()
     df_assistance.to_csv(interim_path / 'assistance.csv', index=False)

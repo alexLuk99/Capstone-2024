@@ -353,6 +353,11 @@ def read_prepare_data() -> None:
     df_workshop = df_workshop.convert_dtypes()
     df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%Y%m%d')
 
+    # Load the new Q-Line Reparaturdaten data from Excel
+    df_qline_reparatur = pd.read_excel(open(input_path / 'Q-Lines_Reparaturdaten_2024-05-14.xlsx', 'rb'))
+    df_qline_reparatur = df_qline_reparatur.convert_dtypes()
+    df_qline_reparatur['Reparaturendedatum'] = pd.to_datetime(df_qline_reparatur['Reparaturendedatum'], format='%Y%m%d')
+
     # Drop duplicated Q-Line entries (623) -> in Q&A4 abgenommen
     df_workshop = df_workshop.drop_duplicates(subset=['Q-Line'])
 
@@ -562,10 +567,10 @@ def read_prepare_data() -> None:
 
     logger.info('Matched files ... Done')
 
-    # Laden der vorbereiteten Daten
-    # df_assistance_filtered = pd.read_csv('data/interim/assistance.csv')
-    # df_workshop = pd.read_csv('data/interim/workshop.csv')
-    # fall_id_to_aufenthalt_id = pd.read_csv('data/interim/fall_id_to_aufenthalt_id.csv')
+    #Laden der vorbereiteten Daten
+    df_assistance_filtered = pd.read_csv('data/interim/assistance.csv')
+    df_workshop = pd.read_csv('data/interim/workshop.csv')
+    fall_id_to_aufenthalt_id = pd.read_csv('data/interim/fall_id_to_aufenthalt_id.csv')
 
     # Filter für "Towing" oder "Scheduled Towing" in der Assistance-Datei
     df_assistance_filtered_towing = df_assistance_filtered[

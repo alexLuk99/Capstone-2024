@@ -115,7 +115,7 @@ def read_prepare_data() -> None:
     df_assistance.loc[df_assistance['Odometer'] < 50, 'Odometer'] = np.nan
     df_assistance.loc[df_assistance['Odometer'] > 260_000, 'Odometer'] = np.nan
 
-    #Binning of Odometer
+    # Binning of Odometer
     bins = np.arange(0, 260000, 20000)
     labels = [f'{int(b)}-{int(b + 20000)}' for b in bins[:-1]]
     df_assistance['Odometer_Binned'] = pd.cut(df_assistance['Odometer'], bins=bins, labels=labels, right=True)
@@ -353,13 +353,19 @@ def read_prepare_data() -> None:
     df_workshop = df_workshop.convert_dtypes()
     df_workshop['Reparaturbeginndatum'] = pd.to_datetime(df_workshop['Reparaturbeginndatum'], format='%Y%m%d')
 
+    # Drop duplicated Q-Line entries (623) -> in Q&A4 abgenommen
+    df_workshop = df_workshop.drop_duplicates(subset=['Q-Line'])
+
     # Load the new Q-Line Reparaturdaten data from Excel
     df_qline_reparatur = pd.read_excel(open(input_path / 'Q-Lines_Reparaturdaten_2024-05-14.xlsx', 'rb'))
     df_qline_reparatur = df_qline_reparatur.convert_dtypes()
     df_qline_reparatur['Reparaturendedatum'] = pd.to_datetime(df_qline_reparatur['Reparaturendedatum'], format='%Y%m%d')
 
-    # Drop duplicated Q-Line entries (623) -> in Q&A4 abgenommen
-    df_workshop = df_workshop.drop_duplicates(subset=['Q-Line'])
+    # Merge Reparaturendedatum to df_workshop
+    df_workshop = df_workshop.merge(df_qline_reparatur[['Q-Line', 'Reparaturendedatum']], on=['Q-Line'])
+
+    df_workshop['SuS_enddate_before_startdate'] = df_workshop['Reparaturendedatum'] - df_workshop[
+        'Reparaturbeginndatum']
 
     # Rename FIN in VIN
     df_workshop = df_workshop.rename(columns={'FIN': 'VIN'})
@@ -520,10 +526,37 @@ def read_prepare_data() -> None:
 
     df_assistance['SuS_Merged'] = False
     df_assistance.loc[((df_assistance['Outcome Description'].isin(['Towing', 'Scheduled Towing'])) & (
-                df_assistance['Merged'] == False)), 'SuS_Merged'] = True
+            df_assistance['Merged'] == False)), 'SuS_Merged'] = True
+
+    ### WIP check if call happened when car in dealershop
+    df1 = df_assistance[['VIN', 'Incident Date']].copy()
+    df2 = df_workshop[['VIN', 'Reparaturbeginndatum', 'Reparaturendedatum']].copy().sort_values(
+        by='Reparaturbeginndatum')
+
+    # Add one day to Reparaturbeginndatum for check as the car may be in the workshop the same day
+    df2['Reparaturbeginndatum'] = df2['Reparaturbeginndatum'] + pd.Timedelta(days=1)
+
+    merged_df = pd.merge(df1, df2, on='VIN', how='inner')
+
+    result_df = merged_df[(merged_df['Incident Date'] > merged_df['Reparaturbeginndatum']) & (
+                merged_df['Incident Date'] < merged_df['Reparaturendedatum'])]
+
+    result_df = result_df.groupby(by=['VIN', 'Incident Date'], as_index=False).agg({
+        'Reparaturbeginndatum': 'first',
+        'Reparaturendedatum': 'last'
+    })
+
+    # Subtract the 1 day from the Reparaturbeginndatum to get original date again
+    result_df['Reparaturbeginndatum'] = result_df['Reparaturbeginndatum'] - pd.Timedelta(days=1)
+
+    result_df['SuS_Call_while_car_in_workshop'] = True
+
+    df_assistance = df_assistance.merge(result_df, on=['VIN', 'Incident Date'], how='left')
+
+    df_assistance['SuS_Call_while_car_in_workshop'] = df_assistance['SuS_Call_while_car_in_workshop'].fillna(False)
 
     sus_columns = ['SuS_Anruferzahl', 'SuS_Vertragszeitraum', 'SuS_Services_Offered', 'SuS_AnrufeInFall',
-                   'SuS_Rental_Car', 'SuS_Breakdown', 'SuS_Abschleppungen', 'SuS_Merged']
+                   'SuS_Rental_Car', 'SuS_Breakdown', 'SuS_Abschleppungen', 'SuS_Merged', 'SuS_Call_while_car_in_workshop']
 
     df_assistance['SuS-O-Meter'] = df_assistance[sus_columns].sum(axis=1) / len(sus_columns)
 
@@ -567,7 +600,7 @@ def read_prepare_data() -> None:
 
     logger.info('Matched files ... Done')
 
-    #Laden der vorbereiteten Daten
+    # Laden der vorbereiteten Daten
     df_assistance_filtered = pd.read_csv('data/interim/assistance.csv')
     df_workshop = pd.read_csv('data/interim/workshop.csv')
     fall_id_to_aufenthalt_id = pd.read_csv('data/interim/fall_id_to_aufenthalt_id.csv')

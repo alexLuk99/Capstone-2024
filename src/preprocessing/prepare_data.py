@@ -530,8 +530,7 @@ def read_prepare_data() -> None:
 
     ### WIP check if call happened when car in dealershop
     df1 = df_assistance[['VIN', 'Incident Date']].copy()
-    df2 = df_workshop[['VIN', 'Reparaturbeginndatum', 'Reparaturendedatum']].copy().sort_values(
-        by='Reparaturbeginndatum')
+    df2 = df_workshop[['VIN', 'Reparaturbeginndatum', 'Reparaturendedatum']].copy()
 
     # Add one day to Reparaturbeginndatum for check as the car may be in the workshop the same day
     df2['Reparaturbeginndatum'] = df2['Reparaturbeginndatum'] + pd.Timedelta(days=1)
